@@ -178,10 +178,11 @@ sobol_des<-function(bassMod,mcmc.use,verbose){
   tot<-tot[,sob.reorder[1:length(names.ind[[1]])],drop=F]
   names(tot)<-allCombs$dispNames[[1]][sob.reorder[1:length(names.ind[[1]])]]
   
+  if(any(sob<0))
+    browser()
+  
   ret<-list(S=sob,T=tot,func=F)
   class(ret)<-'bassSob'
-  
-  #browser()
   
   return(ret)
 }
@@ -242,28 +243,32 @@ sobol_des_func<-function(bassMod,mcmc.use,verbose,func.var,xx.func.var){
       tl$integrals<-array(0,dim=c(length(mcmc.use.mod),max(cs.num.ind),length(xx.func.var))) # where we store all the integrals (not normalized by subtraction)
       jj=0
       for(pp in vars.used){
-        jj=jj+1
-        tl$integrals[,jj,]<-Vu_des_func(pp,tl)
+        #jj=jj+1
+        tl$integrals[,which(combs[[1]]==pp),]<-Vu_des_func(pp,tl)
       }
+      
+      
       
       sob[mod.ind,1:cs.num.ind[1],]<-tl$integrals[,1:cs.num.ind[1],]
       
       if(max(lens)>1){ # if there are any interactions
         for(l in 2:max(lens)){ # must go in order for it to work (tl$integrals is made sequentially)
           int.l.ind<-(cs.num.ind[l-1]+1):cs.num.ind[l]
-          basis.int.l.use<-matrix(nrow=M,ncol=length(ll[[l]]))
+          #basis.int.l.use<-matrix(nrow=M,ncol=length(ll[[l]]))
+          basis.int.l.use<-matrix(nrow=M,ncol=num.ind[l])
+          
           for(m in 1:M){
-            basis.int.l.use[m,]<-unlist(lapply(ll[[l]],function(el){prod(el%in%tl$Kind[m,])})) # all the variables in question must be in the basis
+            #basis.int.l.use[m,]<-unlist(lapply(ll[[l]],function(el){prod(el%in%tl$Kind[m,])})) # all the variables in question must be in the basis
+            basis.int.l.use[m,]<-apply(combs[[l]],2,function(el){prod(el%in%tl$Kind[m,])})
           }
           use<-colSums(basis.int.l.use)>0
           for(pp in which(use)){
             tl$integrals[,int.l.ind[pp],]<-Vu_des_func(combs[[l]][,pp,drop=F],tl) # perform the necessary integration
           }
-          sob.l<-array(0,dim=c(length(mcmc.use.mod),length(ll[[l]]),length(xx.func.var)))
-
+          
+          sob.l<-array(0,dim=c(length(mcmc.use.mod),num.ind[l],length(xx.func.var)))
           for(l2 in (1:length(ll[[l]]))[use]){ # only go through the interactions that are actually in Kind (but still allow for 2-way when actual is 3-way, etc.)
-
-            sob.l[,l2,]<-VuInt_des_func(ll[[l]][[l2]],tl) # do the normalizing
+            sob.l[,l2,]<-VuInt_des_func(combs[[l]][,l2],tl) # do the normalizing
           }
           sob[mod.ind,int.l.ind,]<-sob.l
         }
@@ -290,6 +295,8 @@ sobol_des_func<-function(bassMod,mcmc.use,verbose,func.var,xx.func.var){
   sob<-sob[,sob.reorder,,drop=F]
   sob2<-sob2[,sob.reorder,,drop=F]
 
+  #if(any(sob2<0))
+  #  browser()
   
   ret<-list(S=sob2,S.var=sob,names.ind=unlist(allCombs$dispNames)[sob.reorder],xx=unscale.range(tl$xx,bassMod$range.func),func=T)
   class(ret)<-'bassSob'
@@ -343,7 +350,7 @@ makeBasisMatrixVar<-function(i,nbasis,vars,signs,knots.ind,q,xxt,n.int,xx.train,
 
 ## get all the variable combinations used in the models
 getCombs<-function(bassMod,uniq.models,nmodels,maxBasis,maxInt.tot,func.var=NULL){
-  des.labs<-which(bassMod$cx=='numeric')
+  des.labs<-which(bassMod$cx%in%c('numeric','integer'))
   cat.labs<-which(bassMod$cx=='factor')
   func.labs<-letters[0:sum(bassMod$pfunc)]
   labs<-c(des.labs,func.labs,cat.labs) # this is the order things end up in
@@ -621,6 +628,8 @@ Vu_des_func<-function(u,tl){
       out[i,j]<-t(tt)%*%mat%*%tt
     }
   }
+  if(any(out<0))
+    browser()
   return(out)
 }
 
@@ -644,9 +653,12 @@ VuInt_des_func<-function(u,tl){
   len<-length(u)
   #browser()
   for(l in 1:len){
-    ind<-((sum(tl$cs.num.ind[l-1])+1):tl$cs.num.ind[l])[apply(tl$combs[[l]],2,function(x) all(x%in%u))] # this gets index for which combs are subsets of u, sum(cs.num.ind[l-1]) makes it 0 when it should be 
+    ind<-((sum(tl$cs.num.ind[l-1])+1):tl$cs.num.ind[l])[apply(tl$combs[[l]],2,function(x) all(x%in%u))] # this gets index for which combs are subsets of u, sum() makes it 0 when it should be 
     add<-add+(-1)^(len-l)*apply(tl$integrals[,ind,,drop=F],c(1,3),sum)
   }
+  add[abs(add)<1e-13]<-0
+  if(any(add<0))
+    browser()
   return(add)
 }
 

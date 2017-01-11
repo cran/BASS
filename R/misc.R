@@ -3,19 +3,21 @@
 ########################################################################
 
 ## sample a tempered gamma
-rgammaTemper<-function(n,shape,rate,temper){ 
-  rgamma(n,temper*(shape-1)+1,temper*rate)
+rgammaTemper<-function(n,shape,rate,itemper){ 
+  rgamma(n,itemper*(shape-1)+1,itemper*rate)
 }
 ## sample a tempered IG
-rigammaTemper<-function(n,shape,scale,temper){ 
-  1/rgamma(n,temper*(shape+1)-1,rate=temper*scale)
+rigammaTemper<-function(n,shape,scale,itemper){ 
+  1/rgamma(n,itemper*(shape+1)-1,rate=itemper*scale)
 }
 
 ## scale a vector to be between 0 and 1
 scale.range<-function(x,r=NULL){ # x is a vector
   if(is.null(r))
     r<-range(x)
-  (x-r[1])/(r[2]-r[1])
+  if((r[2]-r[1])==0)
+    return(x-r[1])
+  return((x-r[1])/(r[2]-r[1]))
 }
 ## rescale a vector between 0 and 1 to range r
 unscale.range<-function(x,r){

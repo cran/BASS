@@ -50,7 +50,7 @@ plot.bass<-function(x,quants=c(.025,.975),...){
 #' @description Generate plots for sensitivity analysis of BASS.
 #' @param x a \code{bassSob} object, returned from \code{sobol}.
 #' @param ... graphical parameters.
-#' @details If \code{func.var} in the call to \code{sobol} was \code{NULL}, this returns boxplots of sensitivity indices and total sensitivity indices.  If there were functional variables, they are labeled with letters alphabetically.  Thus, if I fit a model with 4 categorical/continuous inputs and 2 functional inputs, the functional inputs are labeled a and b.  If \code{func.var} was not \code{NULL}, then posterior mean functional sensitivity indices are plotted, along with the functional partitioned variance.  Variables and interactions that are excluded did not explain any varaince.
+#' @details If \code{func.var} in the call to \code{sobol} was \code{NULL}, this returns boxplots of sensitivity indices and total sensitivity indices.  If there were functional variables, they are labeled with letters alphabetically.  Thus, if I fit a model with 4 categorical/continuous inputs and 2 functional inputs, the functional inputs are labeled a and b.  If \code{func.var} was not \code{NULL}, then posterior mean functional sensitivity indices are plotted, along with the functional partitioned variance.  Variables and interactions that are excluded did not explain any variance.
 #' @export
 #' @seealso \link{bass}, \link{predict.bass}, \link{sobol}
 #' @examples
@@ -68,9 +68,9 @@ plot.bassSob<-function(x,...){
     cs.diff<-apply(x.mean,2,function(x) diff(cumsum(c(0,x))))
     text(x=x$xx[lab.x],y=cs[cbind(1:length(lab.x),lab.x)] + (cs.diff/2)[cbind(1:length(lab.x),lab.x)],x$names.ind,...)
     x.mean.var<-apply(x$S.var,2:3,mean)
-    matplot(x$xx[ord],t(apply(x.mean.var,2,cumsum))[ord,],type='l',xlab='x',ylab='variance',main='Varaince Decomposition',...)
+    matplot(x$xx[ord],t(apply(x.mean.var,2,cumsum))[ord,],type='l',xlab='x',ylab='variance',main='Variance Decomposition',...)
   } else{
-    boxplot(x$S,las=2,ylab='proportion varaince',main='Sensitivity',range=0,...)
+    boxplot(x$S,las=2,ylab='proportion variance',main='Sensitivity',range=0,...)
     boxplot(x$T,main='Total Sensitivity',range=0,...)
   }
   par(op)

@@ -33,7 +33,7 @@ birth_des_cat_func<-function(curr,prior,data){
   }
 
   ## calculate log acceptance probability
-  alpha<- data$temp.ladder[curr$temp.ind]*(.5/curr$s2*(qf.cand.list$qf-curr$qf) + log(curr$lam) - log(curr$nc) + log(data$death.prob.next/data$birth.prob) - cand.des$lbmcmp - cand.cat$lbmcmp - cand.func$lbmcmp)
+  alpha<- data$itemp.ladder[curr$temp.ind]*(.5/curr$s2*(qf.cand.list$qf-curr$qf) + log(curr$lam) - log(curr$nc) + log(data$death.prob.next/data$birth.prob) - cand.des$lbmcmp - cand.cat$lbmcmp - cand.func$lbmcmp)
 
   ## assign new values
   if(log(runif(1)) < alpha){
@@ -96,7 +96,7 @@ death_des_cat_func<-function(curr,prior,data){
   }
 
   # calculate log acceptance probability
-  alpha<- data$temp.ladder[curr$temp.ind]*(.5/curr$s2*(qf.cand.list$qf-curr$qf) - log(curr$lam) + log(data$birth.prob.last/data$death.prob) + log(curr$nbasis) + lpbmcmp)
+  alpha<- data$itemp.ladder[curr$temp.ind]*(.5/curr$s2*(qf.cand.list$qf-curr$qf) - log(curr$lam) + log(data$birth.prob.last/data$death.prob) + log(curr$nbasis) + lpbmcmp)
 
   if(log(runif(1)) < alpha){
     curr<-deleteBasis(curr,basis,ind,qf.cand.list,I.star.des,I.vec.des,z.star.des,z.vec.des)
@@ -155,7 +155,7 @@ change_des_cat_func<-function(curr,prior,data){
     return(curr)
   }
 
-  alpha<-data$temp.ladder[curr$temp.ind]*.5/curr$s2*(qf.cand.list$qf-curr$qf)
+  alpha<-data$itemp.ladder[curr$temp.ind]*.5/curr$s2*(qf.cand.list$qf-curr$qf)
 
   if(log(runif(1))<alpha){
     curr<-changeBasis(curr,cand.des,basis,qf.cand.list,XtX.cand,Xty.cand)

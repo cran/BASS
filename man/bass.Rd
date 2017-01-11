@@ -7,7 +7,7 @@
 bass(xx, y, maxInt = 3, maxInt.func = 3, maxInt.cat = 3, xx.func = NULL,
   degree = 1, maxBasis = 1000, npart = NULL, npart.func = NULL,
   nmcmc = 10000, nburn = 9000, thin = 1, g1 = 0, g2 = 0, h1 = 10,
-  h2 = 10, a.beta.prec = 1, b.beta.prec = NULL, w1 = 5, w2 = 5,
+  h2 = 10, a.tau = 1, b.tau = NULL, w1 = 5, w2 = 5,
   temp.ladder = NULL, start.temper = NULL, curr.list = NULL,
   save.yhat = TRUE, verbose = TRUE)
 }
@@ -26,7 +26,7 @@ bass(xx, y, maxInt = 3, maxInt.func = 3, maxInt.cat = 3, xx.func = NULL,
 
 \item{degree}{degree of splines.  Stability should be examined for anything other than 1.}
 
-\item{maxBasis}{maximum number of basis functions.}
+\item{maxBasis}{maximum number of basis functions.  This should probably only be altered if you run out of memory.}
 
 \item{npart}{minimum number of non-zero points in a basis function.  If the response is functional, this refers only to the portion of the basis function coming from the non-functional predictors. Defaults to 20 or 0.1 times the number of observations, whichever is smaller.}
 
@@ -46,17 +46,17 @@ bass(xx, y, maxInt = 3, maxInt.func = 3, maxInt.cat = 3, xx.func = NULL,
 
 \item{h2}{rate for gamma prior on \eqn{\lambda}.  This is the primary way to control overfitting.  A large value of \code{h2} favors fewer basis functions.}
 
-\item{a.beta.prec}{shape for gamma prior on \eqn{\tau}.}
+\item{a.tau}{shape for gamma prior on \eqn{\tau}.}
 
-\item{b.beta.prec}{rate for gamma prior on \eqn{\tau}. Defaults to one over the number of observations, which is the unit information prior.}
+\item{b.tau}{rate for gamma prior on \eqn{\tau}. Defaults to one over the number of observations, which centers the prior for the basis function weights on the unit information prior.}
 
-\item{w1}{nominal weight for degree of interaction, used in generating candidate basis functions.}
+\item{w1}{nominal weight for degree of interaction, used in generating candidate basis functions.  Should be greater than 0.}
 
-\item{w2}{nominal weight for variables, used in generating candidate basis functions.}
+\item{w2}{nominal weight for variables, used in generating candidate basis functions.  Should be greater than 0.}
 
-\item{temp.ladder}{temperature ladder used for parallel tempering.  The first value should be 1 and the values should decrease.}
+\item{temp.ladder}{temperature ladder used for parallel tempering.  The first value should be 1 and the values should increase.}
 
-\item{start.temper}{when to start tempering (after how many MCMC iterations).}
+\item{start.temper}{when to start tempering (after how many MCMC iterations). Defaults to 1000 or half of burn-in, whichever is smaller.}
 
 \item{curr.list}{list of starting models (one element for each temperature), could be output from a previous run under the same model setup.}
 
@@ -71,7 +71,7 @@ An object of class 'bass'.  The other output will only be useful to the advanced
 Fits a BASS model using RJMCMC.  Optionally uses parallel tempering to improve mixing.  Can be used with scalar or functional response.  Also can use categorical inputs.
 }
 \details{
-Explores BASS model space by RJMCMC.  The BASS model has \deqn{y = f(x) + \epsilon,  \epsilon ~ N(0,\sigma^2)} \deqn{f(x) = a_0 + \sum_{m=1}^M a_m B_m(x)} and \eqn{B_m(x)} is a BASS basis function (tensor product of spline basis functions). We use priors \deqn{a ~ N(0,\sigma^2/\tau (B'B)^{-1})} \deqn{M ~ Poisson(\lambda)} as well as the priors mentioned in the arguments above.
+Explores BASS model space by RJMCMC.  The BASS model has \deqn{y = f(x) + \epsilon,  ~~\epsilon \sim N(0,\sigma^2)} \deqn{f(x) = a_0 + \sum_{m=1}^M a_m B_m(x)} and \eqn{B_m(x)} is a BASS basis function (tensor product of spline basis functions). We use priors \deqn{a \sim N(0,\sigma^2/\tau (B'B)^{-1})} \deqn{M \sim Poisson(\lambda)} as well as the priors mentioned in the arguments above.
 }
 \examples{
 \dontrun{

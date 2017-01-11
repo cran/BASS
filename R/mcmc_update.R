@@ -24,12 +24,12 @@ updateMCMC<-function(curr,prior,data,funcs=funcs){
   ## Gibbs updates
   
   # beta
-  curr$beta<-curr$bhat/(1+curr$beta.prec)+curr$R.inv.t%*%rnorm(curr$nc)*sqrt(curr$s2/(1+curr$beta.prec)/data$temp.ladder[curr$temp.ind])
+  curr$beta<-curr$bhat/(1+curr$beta.prec)+curr$R.inv.t%*%rnorm(curr$nc)*sqrt(curr$s2/(1+curr$beta.prec)/data$itemp.ladder[curr$temp.ind])
   
   # lambda
   lam.a<-prior$h1+curr$nbasis
   lam.b<-prior$h2+1
-  curr$lam<-rgammaTemper(1,lam.a,lam.b,data$temp.ladder[curr$temp.ind])
+  curr$lam<-rgammaTemper(1,lam.a,lam.b,data$itemp.ladder[curr$temp.ind])
   
   # s2
   qf2<-crossprod(curr$R%*%curr$beta)
@@ -41,23 +41,23 @@ updateMCMC<-function(curr,prior,data,funcs=funcs){
     s2.b<-prior$g2+curr$s2.rate
     warning('Increased g2 for numerical stability')
   }
-  curr$s2<-rigammaTemper(1,s2.a,s2.b,data$temp.ladder[curr$temp.ind])
+  curr$s2<-rigammaTemper(1,s2.a,s2.b,data$itemp.ladder[curr$temp.ind])
   if(is.nan(curr$s2) | is.na(curr$s2)) # major variance inflation, get huge betas from curr$R.inv.t, everything becomes unstable
     browser()
   if(curr$s2==0 | curr$s2>1e10){ # tempering instability, this temperature too small
+    #browser()
     curr$s2<-runif(1,0,1e6)
     prior$g2<-prior$g2+1
     warning('Small temperature too small...increased g2 for numerical stability')
-    #browser()
   }
   
   # beta.prec
   beta.prec.a<-prior$a.beta.prec+(curr$nbasis+1)/2
   beta.prec.b<-prior$b.beta.prec+1/(2*curr$s2)*qf2
-  curr$beta.prec<-rgammaTemper(1,beta.prec.a,beta.prec.b,data$temp.ladder[curr$temp.ind])
+  curr$beta.prec<-rgammaTemper(1,beta.prec.a,beta.prec.b,data$itemp.ladder[curr$temp.ind])
   
   ## save log posterior
   curr$lpost<-lp(curr,prior,data)
-  
+
   return(curr)
 }

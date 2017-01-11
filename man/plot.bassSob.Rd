@@ -15,7 +15,7 @@
 Generate plots for sensitivity analysis of BASS.
 }
 \details{
-If \code{func.var} in the call to \code{sobol} was \code{NULL}, this returns boxplots of sensitivity indices and total sensitivity indices.  If there were functional variables, they are labeled with letters alphabetically.  Thus, if I fit a model with 4 categorical/continuous inputs and 2 functional inputs, the functional inputs are labeled a and b.  If \code{func.var} was not \code{NULL}, then posterior mean functional sensitivity indices are plotted, along with the functional partitioned variance.  Variables and interactions that are excluded did not explain any varaince.
+If \code{func.var} in the call to \code{sobol} was \code{NULL}, this returns boxplots of sensitivity indices and total sensitivity indices.  If there were functional variables, they are labeled with letters alphabetically.  Thus, if I fit a model with 4 categorical/continuous inputs and 2 functional inputs, the functional inputs are labeled a and b.  If \code{func.var} was not \code{NULL}, then posterior mean functional sensitivity indices are plotted, along with the functional partitioned variance.  Variables and interactions that are excluded did not explain any variance.
 }
 \examples{
 # See examples in bass documentation.

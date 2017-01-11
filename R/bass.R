@@ -6,13 +6,13 @@
 #'
 #' @description Fits a BASS model using RJMCMC.  Optionally uses parallel tempering to improve mixing.  Can be used with scalar or functional response.  Also can use categorical inputs.
 #' @param xx a data frame or matrix of predictors.  Categorical predictors should be included as factors.
-#' @param y  a response vector (scalar response) or matrix (functional response).
+#' @param y a response vector (scalar response) or matrix (functional response).
 #' @param maxInt integer for maximum degree of interaction in spline basis functions.  Defaults to the number of predictors, which could result in overfitting.
 #' @param maxInt.func (functional response only) integer for maximum degree of interaction in spline basis functions describing the functional response.
 #' @param maxInt.cat (categorical input only) integer for maximum degree of interaction of categorical inputs.
 #' @param xx.func a vector, matrix or data frame of functional variables.
 #' @param degree degree of splines.  Stability should be examined for anything other than 1.
-#' @param maxBasis maximum number of basis functions.
+#' @param maxBasis maximum number of basis functions.  This should probably only be altered if you run out of memory.
 #' @param npart minimum number of non-zero points in a basis function.  If the response is functional, this refers only to the portion of the basis function coming from the non-functional predictors. Defaults to 20 or 0.1 times the number of observations, whichever is smaller.
 #' @param npart.func same as npart, but for functional portion of basis function.
 #' @param nmcmc number of RJMCMC iterations.
@@ -22,16 +22,16 @@
 #' @param g2 scale for IG prior on \eqn{\sigma^2}.
 #' @param h1 shape for gamma prior on \eqn{\lambda}.
 #' @param h2 rate for gamma prior on \eqn{\lambda}.  This is the primary way to control overfitting.  A large value of \code{h2} favors fewer basis functions.
-#' @param a.beta.prec shape for gamma prior on \eqn{\tau}.
-#' @param b.beta.prec rate for gamma prior on \eqn{\tau}. Defaults to one over the number of observations, which is the unit information prior.
-#' @param w1 nominal weight for degree of interaction, used in generating candidate basis functions.
-#' @param w2 nominal weight for variables, used in generating candidate basis functions.
-#' @param temp.ladder temperature ladder used for parallel tempering.  The first value should be 1 and the values should decrease.
-#' @param start.temper when to start tempering (after how many MCMC iterations).
+#' @param a.tau shape for gamma prior on \eqn{\tau}.
+#' @param b.tau rate for gamma prior on \eqn{\tau}. Defaults to one over the number of observations, which centers the prior for the basis function weights on the unit information prior.
+#' @param w1 nominal weight for degree of interaction, used in generating candidate basis functions.  Should be greater than 0.
+#' @param w2 nominal weight for variables, used in generating candidate basis functions.  Should be greater than 0.
+#' @param temp.ladder temperature ladder used for parallel tempering.  The first value should be 1 and the values should increase.
+#' @param start.temper when to start tempering (after how many MCMC iterations). Defaults to 1000 or half of burn-in, whichever is smaller.
 #' @param curr.list list of starting models (one element for each temperature), could be output from a previous run under the same model setup.
 #' @param save.yhat logical; should predictions of training data be saved?
 #' @param verbose logical; should progress be displayed?
-#' @details Explores BASS model space by RJMCMC.  The BASS model has \deqn{y = f(x) + \epsilon,  \epsilon ~ N(0,\sigma^2)} \deqn{f(x) = a_0 + \sum_{m=1}^M a_m B_m(x)} and \eqn{B_m(x)} is a BASS basis function (tensor product of spline basis functions). We use priors \deqn{a ~ N(0,\sigma^2/\tau (B'B)^{-1})} \deqn{M ~ Poisson(\lambda)} as well as the priors mentioned in the arguments above.
+#' @details Explores BASS model space by RJMCMC.  The BASS model has \deqn{y = f(x) + \epsilon,  ~~\epsilon \sim N(0,\sigma^2)} \deqn{f(x) = a_0 + \sum_{m=1}^M a_m B_m(x)} and \eqn{B_m(x)} is a BASS basis function (tensor product of spline basis functions). We use priors \deqn{a \sim N(0,\sigma^2/\tau (B'B)^{-1})} \deqn{M \sim Poisson(\lambda)} as well as the priors mentioned in the arguments above.
 #' @return An object of class 'bass'.  The other output will only be useful to the advanced user.  Rather, users may be interested in prediction and sensitivity analysis, which are obtained by passing the entire object to the predict.bass or sobol functions.
 #' @keywords nonparametric regression, splines, functional data analysis
 #' @seealso \link{predict.bass} for prediction and \link{sobol} for sensitivity analysis.
@@ -40,11 +40,11 @@
 #' @import utils
 #' @example ../examples/examples.R
 #'
-bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,maxBasis=1000,npart=NULL,npart.func=NULL,nmcmc=10000,nburn=9000,thin=1,g1=0,g2=0,h1=10,h2=10,a.beta.prec=1,b.beta.prec=NULL,w1=5,w2=5,temp.ladder=NULL,start.temper=NULL,curr.list=NULL,save.yhat=TRUE,verbose=TRUE){
+bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,maxBasis=1000,npart=NULL,npart.func=NULL,nmcmc=10000,nburn=9000,thin=1,g1=0,g2=0,h1=10,h2=10,a.tau=1,b.tau=NULL,w1=5,w2=5,temp.ladder=NULL,start.temper=NULL,curr.list=NULL,save.yhat=TRUE,verbose=TRUE){
 
   ########################################################################
   ## setup
-
+  
   ## check inputs
   
   if(!posInt(maxInt))
@@ -77,11 +77,16 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
     stop('nmcmc must be greater than nburn')
   if(thin>(nmcmc-nburn))
     stop('combination of thin, nmcmc and nburn results in no samples')
-  if(any(c(g1,g2,h1,h2,a.beta.prec,b.beta.prec,w1,w2)<0))
-    stop('g1,g2,h1,h2,a.beta.prec,b.beta.prec,w1,w2 must be greater than 0 (g1 and g2 may be equal to 0)')
+  if(any(c(g1,g2)<0))
+    stop('g1 and g2 must be greater than or equal to 0')
+  if(any(c(h1,h2,a.tau,b.tau,w1,w2)<=0))
+    stop('h1,h2,a.tau,b.tau,w1,w2 must be greater than 0')
   
   ## process data
+  if(any(is.na(xx)) | any(is.na(y)))
+    stop('Current version does not allow missing data')
   
+  y<-as.matrix(y)
   xx<-as.data.frame(xx)
   dx<-dim(xx)
   dxf<-dim(xx.func)
@@ -162,19 +167,25 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
   if(is.null(temp.ladder)){
     temp.ladder<-1
   }
-  if(min(temp.ladder)<(2/dx[1])){
-    temp.ladder<-temp.ladder[temp.ladder>(2/dx[1])]
+  if(max(temp.ladder)>(dx[1]/2)){
+    temp.ladder<-temp.ladder[temp.ladder<(dx[1]/2)]
     if(length(temp.ladder)==0)
-      stop('invalid temp.ladder (temperatures too small)')
+      stop('invalid temp.ladder (temperatures too high)')
   }
-  if(max(temp.ladder)!=1)
-    warning('max(temp.ladder) should equal 1')
+  if(min(temp.ladder)!=1)
+    warning('min(temp.ladder) should equal 1')
   ntemps<-length(temp.ladder)
   if(ntemps==1){
     start.temper<-nmcmc
   }
+  if(is.null(start.temper))
+    start.temper<-min(1000,ceiling(nburn*.5))
   temp.val<-matrix(nrow=nmcmc,ncol=ntemps)
 
+  if(any(temp.ladder<=0))
+    stop('temp.ladder must be greater than 0 (should be greater than 1)')
+  if(any(temp.ladder<1))
+    warning('temp.ladder should be greater than 1')
 
   ## make a data object
 
@@ -223,7 +234,7 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
   data$birth.prob<-1/3
   data$birth.prob.last<-1/3
   data$death.prob<-1/3
-  data$temp.ladder<-temp.ladder
+  data$itemp.ladder<-1/temp.ladder
   
   
   ## make a prior object
@@ -253,11 +264,11 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
   prior$h2<-h2
   prior$g1<-g1
   prior$g2<-g2
-  prior$a.beta.prec<-a.beta.prec
-  if(is.null(b.beta.prec)){
+  prior$a.beta.prec<-a.tau
+  if(is.null(b.tau)){
     prior$b.beta.prec<-1/data$n
   } else{
-  prior$b.beta.prec<-b.beta.prec
+  prior$b.beta.prec<-b.tau
   }
   prior$maxBasis<-maxBasis
   prior$minInt<-0
@@ -308,18 +319,18 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
       curr.list[[i]]$knotInd.des<-matrix(integer(0),ncol=maxInt.des)
       curr.list[[i]]$signs.des<-matrix(integer(0),ncol=maxInt.des)
       curr.list[[i]]$vars.des<-matrix(integer(0),ncol=maxInt.des)
-      curr.list[[i]]$n.int.des<-NA
+      curr.list[[i]]$n.int.des<-0
 
       curr.list[[i]]$sub.list<-list()
       curr.list[[i]]$sub.size<-matrix(integer(0),ncol=maxInt.cat)
       curr.list[[i]]$vars.cat<-matrix(integer(0),ncol=maxInt.cat)
-      curr.list[[i]]$n.int.cat<-NA
+      curr.list[[i]]$n.int.cat<-0
 
       curr.list[[i]]$knots.func<-matrix(numeric(0),ncol=maxInt.func)
       curr.list[[i]]$knotInd.func<-matrix(integer(0),ncol=maxInt.func)
       curr.list[[i]]$signs.func<-matrix(integer(0),ncol=maxInt.func)
       curr.list[[i]]$vars.func<-matrix(integer(0),ncol=maxInt.func)
-      curr.list[[i]]$n.int.func<-NA
+      curr.list[[i]]$n.int.func<-0
 
       curr.list[[i]]$Xty<-rep(NA,maxBasis+2)
       curr.list[[i]]$Xty[1]<-sum(data$y)
@@ -378,7 +389,7 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
   # temperature index
   cold.chain<-1 # to start, the cold chain is curr.list[[1]]
   temp.ind<-1:ntemps # we will change this vector as we swap temperatures
-  count.swap<-count.swap.disp<-rep(0,ntemps-1) # number of swaps between each set of neighbors
+  count.swap<-count.swap.prop<-rep(0,ntemps-1) # number of swaps between each set of neighbors
   swap<-NA # to keep track of swaps
   #require(parallel) # for tempering
 
@@ -394,7 +405,8 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
     ## update model for each temperature - can be parallel
     
     #curr.list<-parLapply(cluster,curr.list,updateMCMC)
-    curr.list<-parallel::mclapply(curr.list,updateMCMC,prior=prior,data=data,funcs=funcs,mc.preschedule=T,mc.cores=1)
+    #curr.list<-parallel::mclapply(curr.list,updateMCMC,prior=prior,data=data,funcs=funcs,mc.preschedule=T,mc.cores=1)
+    curr.list<-lapply(curr.list,updateMCMC,prior=prior,data=data,funcs=funcs)
     # TODO: DO SOMETHING LIKE THIS BUT KEEP EVERYTHING SEPARATE ON THE CLUSTER, all we need is lpost, cmod - MPI
     
     ## parallel tempering swap
@@ -405,11 +417,12 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
       temp.ind.swap2<-temp.ind.swap1+1 # always use the neighboring chain on the right
       chain.ind1<-which(temp.ind==temp.ind.swap1) # which chain has temperature temp.ladder[temp.ind.swap1]
       chain.ind2<-which(temp.ind==temp.ind.swap2)
-      alpha.swap<-(data$temp.ladder[temp.ind.swap1]-data$temp.ladder[temp.ind.swap2])*(curr.list[[chain.ind2]]$lpost-curr.list[[chain.ind1]]$lpost)
+      alpha.swap<-(data$itemp.ladder[temp.ind.swap1]-data$itemp.ladder[temp.ind.swap2])*(curr.list[[chain.ind2]]$lpost-curr.list[[chain.ind1]]$lpost)
       if(is.nan(alpha.swap) | is.na(alpha.swap)){
         alpha.swap<- -9999
-        warning('Small values of temp.ladder too small')
+        warning('large values of temp.ladder too large')
       }
+      count.swap.prop[temp.ind.swap1]<-count.swap.prop[temp.ind.swap1]+1
       if(log(runif(1)) < alpha.swap){
         # swap temperatures
         temp.ind[chain.ind1]<-temp.ind.swap2
@@ -418,7 +431,6 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
         curr.list[[chain.ind2]]$temp.ind<-temp.ind.swap1
 
         count.swap[temp.ind.swap1]<-count.swap[temp.ind.swap1]+1
-        count.swap.disp[temp.ind.swap1]<-count.swap.disp[temp.ind.swap1]+1
         swap[i]<-temp.ind.swap1
         if(temp.ind.swap1==1){
           cmod<-T # we changed models
@@ -484,9 +496,8 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
     if(verbose & i%%1000==0){
       pr<-c('MCMC iteration',i,timestamp(prefix='#--',suffix='--#',quiet=T),'nbasis:',curr.list[[cold.chain]]$nbasis)
       if(i>start.temper)
-        pr<-c(pr,'tempering acc',count.swap.disp/(1000/(ntemps-1))) # swap acceptance rate for last 1000
+        pr<-c(pr,'tempering acc',round(count.swap/count.swap.prop,3)) # swap acceptance rate
       cat(pr,'\n')
-      count.swap.disp<-rep(0,ntemps-1) # reset after displaying
     }
 
   }
@@ -515,7 +526,9 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
        curr.list=curr.list, # for restarting
        swap=swap,
        count.swap=count.swap,
+       count.swap.prop=count.swap.prop,
        temp.val=temp.val,
+       temp.ladder=temp.ladder,
        n.models=n.models,
        model.lookup=model.lookup,
        des=des,func=func,cat=cat,type=type,cx=cx

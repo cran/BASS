@@ -44,8 +44,6 @@ logProbChangeModCat<-function(n.int,vars,I.vec,z.vec,p,nlevels,sub.size,maxInt,m
 
 ## log posterior
 lp<-function(curr,prior,data){ 
-  if(curr$nbasis==0)
-    return(NA)
   tt<-(
     - (curr$s2.rate+prior$g2)/curr$s2
     -(data$n/2+1+(curr$nbasis+1)/2 -prior$g1)*log(curr$s2)
@@ -54,6 +52,9 @@ lp<-function(curr,prior,data){
     - (curr$nbasis+1)/2*log(2*pi)
     + (prior$h1+curr$nbasis-1)*log(curr$lam) - curr$lam*(prior$h2+1)
   )
+  if(curr$nbasis==0){
+    return(tt)
+  }
   #priors for basis parameters
   if(data$des){
     tt<-tt+(
