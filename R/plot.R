@@ -8,7 +8,7 @@
 #' @param x a \code{bass} object.
 #' @param quants quantiles for intervals, if desired.  NULL if not desired.
 #' @param ... graphical parameters.
-#' @details The first two plots are trace plots for diagnosing convergence.  The third plot is posterior predicted vs observed, with intervals for predictions.  The fourth plot is a histogram of the residuals (of the posterior mean model), with a red curve showing the assumed Normal density (using posterior mean variance).
+#' @details The first two plots are trace plots for diagnosing convergence.  The third plot is posterior predicted vs observed, with intervals for predictions.  The fourth plot is a histogram of the residuals (of the posterior mean model), with a red curve showing the assumed Normal density (using posterior mean variance).  If \code{bass} was run with \code{save.yhat = FALSE}, the third and fourth plots are omitted.
 #' @export 
 #' @import graphics
 #' @seealso \link{bass}, \link{predict.bass}, \link{sobol}
@@ -16,31 +16,41 @@
 #' # See examples in bass documentation.
 #'
 plot.bass<-function(x,quants=c(.025,.975),...){
+  if(class(x)!='bass')
+    stop('x must be an object of class bass')
+  pred<-T
+  if(is.null(x$yhat.mean))
+    pred<-F
   op<-par(no.readonly=T)
-  par(mfrow=c(2,2))
+  if(pred)
+    par(mfrow=c(2,2))
+  else
+    par(mfrow=c(1,2))
   plot(x$nbasis,type='l',ylab='number of basis functions',xlab='MCMC iteration (post-burn)')
   plot(x$s2,type='l',ylab='error variance',xlab='MCMC iteration (post-burn)')
-  margin<-2
-  if(x$func)
-    margin<-2:3
-  s<-sqrt(x$s2)
-  if(!is.null(quants)){
-    qq1<-apply(x$yhat+qnorm(quants[2])*s,margin,quantile,probs=quants[2])
-    qq2<-apply(x$yhat+qnorm(quants[1])*s,margin,quantile,probs=quants[1])
-    ylim=range(c(qq1,qq2))
-    ylab='interval'
-  } else{
-    ylim=range(x$yhat.mean)
-    ylab='mean'
+  if(pred){
+    margin<-2
+    if(x$func)
+      margin<-2:3
+    s<-sqrt(x$s2)
+    if(!is.null(quants)){
+      qq1<-apply(x$yhat+qnorm(quants[2])*s,margin,quantile,probs=quants[2])
+      qq2<-apply(x$yhat+qnorm(quants[1])*s,margin,quantile,probs=quants[1])
+      ylim=range(c(qq1,qq2))
+      ylab='interval'
+    } else{
+      ylim=range(x$yhat.mean)
+      ylab='mean'
+    }
+    plot(x$y,x$yhat.mean,ylim=ylim,ylab=paste('posterior predictive',ylab),xlab='observed',main='Training Fit',type='n',...)
+    if(!is.null(quants))
+      segments(x$y,qq1,x$y,qq2,col='lightgrey')
+    points(x$y,x$yhat.mean)
+    abline(a=0,b=1,col=2)
+  
+    hist(x$y-x$yhat.mean,freq=F,main='Posterior mean residuals',xlab='residuals')
+    curve(dnorm(x,sd=mean(s)),col=2,add=T)
   }
-  plot(x$y,x$yhat.mean,ylim=ylim,ylab=paste('posterior predictive',ylab),xlab='observed',main='Training Fit',type='n',...)
-  if(!is.null(quants))
-    segments(x$y,qq1,x$y,qq2,col='lightgrey')
-  points(x$y,x$yhat.mean)
-  abline(a=0,b=1,col=2)
-
-  hist(x$y-x$yhat.mean,freq=F,main='Posterior mean residuals',xlab='residuals')
-  curve(dnorm(x,sd=mean(s)),col=2,add=T)
   par(op)
 }
 

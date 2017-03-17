@@ -36,4 +36,3 @@ Efficiently predicts when two MCMC iterations have the same basis functions (but
 \seealso{
 \link{bass} for model fitting and \link{sobol} for sensitivity analysis.
 }
-

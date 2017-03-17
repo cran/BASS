@@ -17,7 +17,7 @@
 Generate diagnostic plots for BASS model fit.
 }
 \details{
-The first two plots are trace plots for diagnosing convergence.  The third plot is posterior predicted vs observed, with intervals for predictions.  The fourth plot is a histogram of the residuals (of the posterior mean model), with a red curve showing the assumed Normal density (using posterior mean variance).
+The first two plots are trace plots for diagnosing convergence.  The third plot is posterior predicted vs observed, with intervals for predictions.  The fourth plot is a histogram of the residuals (of the posterior mean model), with a red curve showing the assumed Normal density (using posterior mean variance).  If \code{bass} was run with \code{save.yhat = FALSE}, the third and fourth plots are omitted.
 }
 \examples{
 # See examples in bass documentation.
@@ -26,4 +26,3 @@ The first two plots are trace plots for diagnosing convergence.  The third plot 
 \seealso{
 \link{bass}, \link{predict.bass}, \link{sobol}
 }
-

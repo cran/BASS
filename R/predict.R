@@ -70,7 +70,7 @@ predict.bass<-function(object,newdata,newdata.func=NULL,mcmc.use=NULL,verbose=FA
   models<-object$model.lookup[mcmc.use]
   
   if(verbose)
-    cat('Predict Start',timestamp(prefix='#--',suffix='--#',quiet=T),'Models:',length(unique(models)),'\n')
+    cat('Predict Start',myTimestamp(),'Models:',length(unique(models)),'\n')
   
   func<-eval(parse(text=paste('mult',object$type,sep='')))
   
@@ -83,7 +83,7 @@ predict.bass<-function(object,newdata,newdata.func=NULL,mcmc.use=NULL,verbose=FA
     out[ind,,]<-func(model=j,mcmc.use.mod=mcmc.use.j,object=object,tnewdata.des=tnewdata.des,newdata.cat=newdata.cat,tnewdata.func=tnewdata.func)
     
     if(verbose & mod.ind%%100==0)
-      cat('Predict',timestamp(prefix='#--',suffix='--#',quiet=T),'Model:',mod.ind,'\n')
+      cat('Predict',myTimestamp(),'Model:',mod.ind,'\n')
   }
   return(drop(out))
 }

@@ -30,18 +30,21 @@
 #' @param start.temper when to start tempering (after how many MCMC iterations). Defaults to 1000 or half of burn-in, whichever is smaller.
 #' @param curr.list list of starting models (one element for each temperature), could be output from a previous run under the same model setup.
 #' @param save.yhat logical; should predictions of training data be saved?
+#' @param small logical; if true, returns a smaller object by leaving out \code{curr.list} and other unnecessary objects.  Use in combination with \code{save.yhat} to get smaller memory footprint for very large models.
 #' @param verbose logical; should progress be displayed?
 #' @details Explores BASS model space by RJMCMC.  The BASS model has \deqn{y = f(x) + \epsilon,  ~~\epsilon \sim N(0,\sigma^2)} \deqn{f(x) = a_0 + \sum_{m=1}^M a_m B_m(x)} and \eqn{B_m(x)} is a BASS basis function (tensor product of spline basis functions). We use priors \deqn{a \sim N(0,\sigma^2/\tau (B'B)^{-1})} \deqn{M \sim Poisson(\lambda)} as well as the priors mentioned in the arguments above.
 #' @return An object of class 'bass'.  The other output will only be useful to the advanced user.  Rather, users may be interested in prediction and sensitivity analysis, which are obtained by passing the entire object to the predict.bass or sobol functions.
 #' @keywords nonparametric regression, splines, functional data analysis
 #' @seealso \link{predict.bass} for prediction and \link{sobol} for sensitivity analysis.
 #' @export
+#' @useDynLib BASS, .registration = TRUE
 #' @import stats
 #' @import utils
 #' @example ../examples/examples.R
 #'
-bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,maxBasis=1000,npart=NULL,npart.func=NULL,nmcmc=10000,nburn=9000,thin=1,g1=0,g2=0,h1=10,h2=10,a.tau=1,b.tau=NULL,w1=5,w2=5,temp.ladder=NULL,start.temper=NULL,curr.list=NULL,save.yhat=TRUE,verbose=TRUE){
+bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,maxBasis=1000,npart=NULL,npart.func=NULL,nmcmc=10000,nburn=9000,thin=1,g1=0,g2=0,h1=10,h2=10,a.tau=1,b.tau=NULL,w1=5,w2=5,temp.ladder=NULL,start.temper=NULL,curr.list=NULL,save.yhat=TRUE,small=FALSE,verbose=TRUE){
 
+  cl<-match.call()
   ########################################################################
   ## setup
   
@@ -398,7 +401,7 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
   ## MCMC
 
   if(verbose)
-    cat('MCMC Start',timestamp(prefix='#--',suffix='--#',quiet=T),'nbasis:',curr.list[[cold.chain]]$nbasis,'\n')
+    cat('MCMC Start',myTimestamp(),'nbasis:',curr.list[[cold.chain]]$nbasis,'\n')
   n.models<-keep.sample<-0 # indexes for storage
   for(i in 2:nmcmc){
 
@@ -423,6 +426,7 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
         warning('large values of temp.ladder too large')
       }
       count.swap.prop[temp.ind.swap1]<-count.swap.prop[temp.ind.swap1]+1
+      #browser()
       if(log(runif(1)) < alpha.swap){
         # swap temperatures
         temp.ind[chain.ind1]<-temp.ind.swap2
@@ -494,7 +498,7 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
     }
 
     if(verbose & i%%1000==0){
-      pr<-c('MCMC iteration',i,timestamp(prefix='#--',suffix='--#',quiet=T),'nbasis:',curr.list[[cold.chain]]$nbasis)
+      pr<-c('MCMC iteration',i,myTimestamp(),'nbasis:',curr.list[[cold.chain]]$nbasis)
       if(i>start.temper)
         pr<-c(pr,'tempering acc',round(count.swap/count.swap.prop,3)) # swap acceptance rate
       cat(pr,'\n')
@@ -511,6 +515,7 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
   }
 
   out<-list(
+       call=cl,
        beta=beta,
        s2=s2,
        lam=lam,
@@ -523,7 +528,6 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
        beta.prec=beta.prec,
        y=y,
        log.post.cold=log.post.cold,
-       curr.list=curr.list, # for restarting
        swap=swap,
        count.swap=count.swap,
        count.swap.prop=count.swap.prop,
@@ -533,7 +537,9 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
        model.lookup=model.lookup,
        des=des,func=func,cat=cat,type=type,cx=cx
   )
-
+  if(!small){
+    out$curr.list<-curr.list # for restarting
+  }
   mb<-max(nbasis)
   
   
@@ -545,11 +551,13 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
       vars.des=vars.des[1:n.models,1:mb,,drop=F],
       n.int.des=n.int.des[1:n.models,1:mb,drop=F],
       maxInt.des=maxInt.des,
-      des.basis=curr.list[[cold.chain]]$des.basis,
       pdes=pdes,
       xx.des=xx.des,range.des=range.des,
       unique.ind.des=data$unique.ind.des
     )
+    if(!small){
+      out.des$des.basis<-curr.list[[cold.chain]]$des.basis
+    }
   }
 
   out.cat<-list()
@@ -560,11 +568,13 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
       sub.list=sub.list,
       n.int.cat=n.int.cat[1:n.models,1:mb,drop=F],
       maxInt.cat=maxInt.cat,
-      cat.basis=curr.list[[cold.chain]]$cat.basis,
       pcat=pcat,
       xx.cat=xx.cat,
       nlevels=data$nlevels
     )
+    if(!small){
+      out.cat$cat.basis<-curr.list[[cold.chain]]$cat.basis
+    }
   }
 
   out.func<-list()
@@ -575,11 +585,13 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
       vars.func=vars.func[1:n.models,1:mb,,drop=F],
       n.int.func=n.int.func[1:n.models,1:mb,drop=F],
       maxInt.func=maxInt.func,
-      func.basis=curr.list[[cold.chain]]$func.basis,
       pfunc=pfunc,
       xx.func=xx.func,range.func=range.func,
       unique.ind.func=data$unique.ind.func
     )
+    if(!small){
+      out.func$func.basis=curr.list[[cold.chain]]$func.basis
+    }
   }
 
   #stopCluster(cluster)

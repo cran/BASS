@@ -24,4 +24,3 @@ If \code{func.var} in the call to \code{sobol} was \code{NULL}, this returns box
 \seealso{
 \link{bass}, \link{predict.bass}, \link{sobol}
 }
-

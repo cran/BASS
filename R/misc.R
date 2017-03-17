@@ -48,3 +48,9 @@ getYhat_des_cat_func<-function(curr,nb){
 posInt<-function(x){
   x==as.integer(x) & x>0
 }
+
+## replacement for timestamp(), since that seems to give Rstudio trouble on Windows
+myTimestamp<-function(){
+  x<-Sys.time()
+  paste('#--',format(x,"%b %d %X"),'--#')
+}

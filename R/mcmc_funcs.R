@@ -46,37 +46,38 @@ logProbChangeModCat<-function(n.int,vars,I.vec,z.vec,p,nlevels,sub.size,maxInt,m
 lp<-function(curr,prior,data){ 
   tt<-(
     - (curr$s2.rate+prior$g2)/curr$s2
-    -(data$n/2+1+(curr$nbasis+1)/2 -prior$g1)*log(curr$s2)
-    + sum(log(abs(diag(curr$R))))
+    -(data$n/2+1+(curr$nbasis+1)/2 +prior$g1)*log(curr$s2) # changed -g1 to +g1
+    + sum(log(abs(diag(curr$R)))) # .5*determinant of XtX
     + (prior$a.beta.prec+(curr$nbasis+1)/2-1)*log(curr$beta.prec) - prior$b.beta.prec*curr$beta.prec
     - (curr$nbasis+1)/2*log(2*pi)
-    + (prior$h1+curr$nbasis-1)*log(curr$lam) - curr$lam*(prior$h2+1)
+    + (prior$h1+curr$nbasis-1)*log(curr$lam) - curr$lam*(prior$h2+1) # curr$nbasis-1 because poisson prior is excluding intercept (for curr$nbasis instead of curr$nbasis+1)
+    #-lfactorial(curr$nbasis) # added, but maybe cancels with prior
   )
   if(curr$nbasis==0){
     return(tt)
   }
   #priors for basis parameters
-  if(data$des){
+  if(F){#(data$des){ # should these be involved in tempering??
     tt<-tt+(
-      - sum(curr$n.int.des)*log(2)
-      - sum(lchoose(data$pdes,curr$n.int.des))
-      - sum(log(data$vars.len.des[na.omit(curr$vars.des)]))
-      - curr$nbasis*log(prior$maxInt.des)
+      - sum(curr$n.int.des)*log(2) # signs for each basis function
+      - sum(lchoose(data$pdes,curr$n.int.des)) # variables for each basis function
+      - sum(log(data$vars.len.des[na.omit(c(curr$vars.des))])) # knots for each basis function
+      - curr$nbasis*log(prior$maxInt.des) # degree of interaction for each basis function
     )
   }
-  if(data$cat){
+  if(F){#(data$cat){
     tt<-tt+(
       - sum(sapply(1:curr$nbasis,function(i) curr$n.int.cat[i]*sum(log(data$nlevels[na.omit(curr$vars.cat[i,])]-1))))
-      - sum(sapply(1:curr$nbasis,function(i) sum(lchoose(data$nlevels[na.omit(curr$vars.cat[i,])],curr$sub.size[i,1:curr$n.int.cat[i]]))))
+      - sum(sapply(1:curr$nbasis,function(i) sum(lchoose(data$nlevels[na.omit(c(curr$vars.cat[i,]))],curr$sub.size[i,1:curr$n.int.cat[i]]))))
       - sum(lchoose(data$pcat,curr$n.int.cat))
       - curr$nbasis*log(prior$maxInt.cat)
     )
   }
-  if(data$func){
+  if(F){#(data$func){
     tt<-tt+(
       - sum(curr$n.int.func)*log(2)
       - sum(lchoose(data$pfunc,curr$n.int.func))
-      - sum(log(data$vars.len.func[na.omit(curr$vars.func)]))
+      - sum(log(data$vars.len.func[na.omit(c(curr$vars.func))]))
       - curr$nbasis*log(prior$maxInt.func)
     )
   }

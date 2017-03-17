@@ -102,9 +102,10 @@ sobol_des<-function(bassMod,mcmc.use,verbose){
   cs.num.ind<-allCombs$cs.num.ind
   ################################################
   sob<-array(0,dim=c(length(mcmc.use),sum(num.ind)))
+  var.tot.store<-f0.store<-rep(0,length(mcmc.use))
 
   if(verbose)
-    cat('Sobol Start',timestamp(prefix='#--',suffix='--#',quiet=T),'Models:',length(unique(models)),'\n')
+    cat('Sobol Start',myTimestamp(),'Models:',length(unique(models)),'\n')
 
   i<-1
   mod.count<-0
@@ -120,7 +121,6 @@ sobol_des<-function(bassMod,mcmc.use,verbose){
         tl<-add_tlCat(tl,bassMod,mcmc.use.mod,mod)
       tl<-add_tl(tl,p)
       lens<-apply(tl$Kind,1,function(x) length(na.omit(x)))
-
 
       var.tot<-Vu(1:p,tl) # total variance
       vars.used<-unique(unlist(na.omit(c(tl$Kind)))) # which variables are used?
@@ -149,10 +149,14 @@ sobol_des<-function(bassMod,mcmc.use,verbose){
       }
       sob[mod.ind,]<-sob[mod.ind,]/var.tot # sobol indices
       i<-i+length(mcmc.use.mod) # for index
-
+      var.tot.store[mod.ind]<-var.tot
+      #browser()
+      C1.temp<-(1/(tl$q+1)*((tl$s+1)/2-tl$s*tl$t))*tl$s^2
+      C1.temp[C1.temp==0]<-1
+      f0.store[mod.ind]<-bassMod$beta[mcmc.use.mod[1],1]+sum(tl$a[1,]*apply(C1.temp,1,prod))
 
       if(verbose & mod.count%%10==0)
-        cat('Sobol',timestamp(prefix='#--',suffix='--#',quiet=T),'Model:',mod.count,'\n')
+        cat('Sobol',myTimestamp(),'Model:',mod.count,'\n')
 
 
     }
@@ -163,15 +167,17 @@ sobol_des<-function(bassMod,mcmc.use,verbose){
 
   
   if(verbose)
-    cat('Total Sensitivity',timestamp(prefix='#--',suffix='--#',quiet=T),'\n')
+    cat('Total Sensitivity',myTimestamp(),'\n')
 
   tot<-getTot(combs,sob,names.ind,p,maxInt.tot,allCombs$aa)
   
   
   sob.reorder<-NA
   sob.reorder[1:length(names.ind[[1]])]<-mixOrd(allCombs$dispNames[[1]])
-  for(l in 2:length(names.ind)){
-    sob.reorder[(cs.num.ind[l-1]+1):(cs.num.ind[l])]<-cs.num.ind[l-1]+mixOrd(allCombs$dispNames[[l]])
+  if(length(names.ind)>1){
+    for(l in 2:length(names.ind)){
+      sob.reorder[(cs.num.ind[l-1]+1):(cs.num.ind[l])]<-cs.num.ind[l-1]+mixOrd(allCombs$dispNames[[l]])
+    }
   }
   sob<-sob[,sob.reorder,drop=F]
   names(sob)<-unlist(allCombs$dispNames)[sob.reorder]
@@ -181,7 +187,7 @@ sobol_des<-function(bassMod,mcmc.use,verbose){
   if(any(sob<0))
     browser()
   
-  ret<-list(S=sob,T=tot,func=F)
+  ret<-list(S=sob,T=tot,func=F,var.tot=var.tot.store,f0=f0.store,ints=tl$integrals)
   class(ret)<-'bassSob'
   
   return(ret)
@@ -218,7 +224,7 @@ sobol_des_func<-function(bassMod,mcmc.use,verbose,func.var,xx.func.var){
   sob<-sob2<-array(0,dim=c(length(mcmc.use),sum(num.ind),length(xx.func.var)))
 
   if(verbose)
-    cat('Sobol Start',timestamp(prefix='#--',suffix='--#',quiet=T),'Models:',length(unique(models)),'\n')
+    cat('Sobol Start',myTimestamp(),'Models:',length(unique(models)),'\n')
 
   i<-1
   mod.count<-0
@@ -282,7 +288,7 @@ sobol_des_func<-function(bassMod,mcmc.use,verbose,func.var,xx.func.var){
       i<-i+length(mcmc.use.mod) # for index
       
       if(verbose & mod.count%%10==0)
-        cat('Sobol',timestamp(prefix='#--',suffix='--#',quiet=T),'Model:',mod.count,'\n')
+        cat('Sobol',myTimestamp(),'Model:',mod.count,'\n')
     }
   }
   
@@ -604,6 +610,7 @@ VuMat<-function(u,tl){
   CCu<-apply(tl$C1.all.prod3[,,u,drop=F],1:2,prod) # TODO: utilize symmetry
   C2.temp<-apply(tl$C2.all2[,,u,drop=F],1:2,prod)
   mat<-tl$CC*(C2.temp/CCu-1)
+  #browser()
   return(mat)
 }
 

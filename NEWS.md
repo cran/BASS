@@ -1,3 +1,11 @@
+# BASS 0.2.2
+- added print and summary methods for bass objects
+
+# BASS 0.2.1
+- added "small" parameter to allow for smaller memory footprint
+- removed uses of timestamp to avoid a bug in Rstudio on Windows
+- corrected example to use temperatures rather than inverse temperatures, and to match vignette
+
 # BASS 0.2.0
 - vignette added
 - argument changes

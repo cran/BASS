@@ -43,4 +43,3 @@ Performs analytical Sobol' decomposition for each MCMC iteration in mcmc.use (ea
 }
 \keyword{Sobol}
 \keyword{decomposition}
-

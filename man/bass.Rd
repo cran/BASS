@@ -9,7 +9,7 @@ bass(xx, y, maxInt = 3, maxInt.func = 3, maxInt.cat = 3, xx.func = NULL,
   nmcmc = 10000, nburn = 9000, thin = 1, g1 = 0, g2 = 0, h1 = 10,
   h2 = 10, a.tau = 1, b.tau = NULL, w1 = 5, w2 = 5,
   temp.ladder = NULL, start.temper = NULL, curr.list = NULL,
-  save.yhat = TRUE, verbose = TRUE)
+  save.yhat = TRUE, small = FALSE, verbose = TRUE)
 }
 \arguments{
 \item{xx}{a data frame or matrix of predictors.  Categorical predictors should be included as factors.}
@@ -62,6 +62,8 @@ bass(xx, y, maxInt = 3, maxInt.func = 3, maxInt.cat = 3, xx.func = NULL,
 
 \item{save.yhat}{logical; should predictions of training data be saved?}
 
+\item{small}{logical; if true, returns a smaller object by leaving out \code{curr.list} and other unnecessary objects.  Use in combination with \code{save.yhat} to get smaller memory footprint for very large models.}
+
 \item{verbose}{logical; should progress be displayed?}
 }
 \value{
@@ -91,7 +93,7 @@ y<-rnorm(n,f(x),sigma)
 mod<-bass(x,y)
 plot(mod)
 ## fit BASS, tempering
-mod<-bass(x,y,temp.ladder=c(1,.8,.65,.5,.4,.3,.23,.15,.1),start.temper=1000)
+mod<-bass(x,y,temp.ladder=1.3^(0:8),start.temper=1000)
 plot(mod)
 
 ## prediction
@@ -153,4 +155,3 @@ mod<-bass(1:2,1:2,nmcmc=2,nburn=1)
 \keyword{nonparametric}
 \keyword{regression,}
 \keyword{splines,}
-

@@ -34,7 +34,7 @@ updateMCMC<-function(curr,prior,data,funcs=funcs){
   # s2
   qf2<-crossprod(curr$R%*%curr$beta)
   curr$s2.rate<-(data$ssy + (1+curr$beta.prec)*qf2 - 2*crossprod(curr$beta,curr$Xty[1:curr$nc]))/2
-  s2.a<-prior$g1+(data$n+curr$nbasis+1)/2
+  s2.a<-prior$g1+(data$n+curr$nbasis+1)/2 # +1 for intercept
   s2.b<-prior$g2+curr$s2.rate
   if(s2.b<=0){
     prior$g2<-prior$g2+1
@@ -48,7 +48,7 @@ updateMCMC<-function(curr,prior,data,funcs=funcs){
     #browser()
     curr$s2<-runif(1,0,1e6)
     prior$g2<-prior$g2+1
-    warning('Small temperature too small...increased g2 for numerical stability')
+    warning('High temperature too high...increased g2 for numerical stability')
   }
   
   # beta.prec
