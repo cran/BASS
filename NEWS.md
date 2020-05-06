@@ -1,4 +1,25 @@
-# BASS 0.2.2
+# BASS 1.2.0
+- Sobol getEffects option added
+- changed how Wallenius' noncentral hypergeometric density is calculated (in R rather than C++ from BiasedUrn)
+- various bug fixes
+
+# BASS 1.1.2
+- added unit tests for prediction and Sobol decomposition for various validated models
+- added ability to write models to JSON, and read models from JSON
+- various options added to existing functions
+- existing function bassOB renamed to bassBasis
+
+# BASS 1.1.1
+- added non-uniform prior support for continuous variables in Sobol decomposition
+
+# BASS 1.1.0
+- fixed bug in acceptance ratios
+- added support for BASS in principal component space, including Sobol decomposition
+
+# BASS 0.2.3 
+- added a lower bound parameter for the prior on s2 (the error variance)
+
+# BASS 0.2.2 
 - added print and summary methods for bass objects
 
 # BASS 0.2.1

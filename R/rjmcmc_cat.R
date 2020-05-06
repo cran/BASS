@@ -1,3 +1,10 @@
+#######################################################
+# Author: Devin Francom, Los Alamos National Laboratory
+# Protected under GPL-3 license
+# Los Alamos Computer Code release C19031
+# github.com/lanl/BASS
+#######################################################
+
 ########################################################################
 ## perform RJMCMC step (birth, death, or change)
 ########################################################################
@@ -24,7 +31,7 @@ birth_cat<-function(curr,prior,data){
   }
 
   ## calculate log acceptance probability
-  alpha<- data$itemp.ladder[curr$temp.ind]*(.5/curr$s2*(qf.cand.list$qf-curr$qf) + log(curr$lam) - log(curr$nc) + log(data$death.prob.next/data$birth.prob) - cand.cat$lbmcmp)
+  alpha<- data$itemp.ladder[curr$temp.ind]*(.5/curr$s2*(qf.cand.list$qf-curr$qf)/(1+curr$beta.prec) + log(curr$lam) - log(curr$nc) + log(data$death.prob.next/data$birth.prob) - cand.cat$lbmcmp + .5*log(curr$beta.prec) - .5*log(1+curr$beta.prec))
   #cat(- cand.des$lbmcmp,' ')
 
   ## assign new values
@@ -45,7 +52,7 @@ death_cat<-function(curr,prior,data){
   if(!fullRank){
     return(curr) # TODO: not sure why I need this, I shouldn't need it in theory
   }
-  
+
   I.star.cat<-curr$I.star.cat
   I.star.cat[curr$n.int.cat[basis]]<-I.star.cat[curr$n.int.cat[basis]]-1
   I.vec.cat<-I.star.cat/sum(I.star.cat)
@@ -54,9 +61,9 @@ death_cat<-function(curr,prior,data){
   z.vec.cat<-z.star.cat/sum(z.star.cat)
 
   lpbmcmp<-logProbChangeModCat(curr$n.int.cat[basis],curr$vars.cat[basis,1:curr$n.int.cat[basis]],I.vec.cat,z.vec.cat,data$pcat,data$nlevels,curr$sub.size[basis,],prior$maxInt.cat,prior$miC)
-  
+
   # calculate log acceptance probability
-  alpha<- data$itemp.ladder[curr$temp.ind]*(.5/curr$s2*(qf.cand.list$qf-curr$qf) - log(curr$lam) + log(data$birth.prob.last/data$death.prob) + log(curr$nbasis) + lpbmcmp)
+  alpha<- data$itemp.ladder[curr$temp.ind]*(.5/curr$s2*(qf.cand.list$qf-curr$qf)/(1+curr$beta.prec) - log(curr$lam) + log(data$birth.prob.last/data$death.prob) + log(curr$nbasis) + lpbmcmp - .5*log(curr$beta.prec) + .5*log(1+curr$beta.prec))
 
   if(log(runif(1)) < alpha){
     curr<-deleteBasis(curr,basis,ind,qf.cand.list,I.star.cat,I.vec.cat,z.star.cat,z.vec.cat)
@@ -89,7 +96,7 @@ change_cat<-function(curr,prior,data){
     return(curr)
   }
 
-  alpha<-data$itemp.ladder[curr$temp.ind]*.5/curr$s2*(qf.cand.list$qf-curr$qf)
+  alpha<-data$itemp.ladder[curr$temp.ind]*.5/curr$s2*(qf.cand.list$qf-curr$qf)/(1+curr$beta.prec)
 
   if(log(runif(1))<alpha){
     curr<-changeBasis(curr,cand.cat,basis,qf.cand.list,XtX.cand,Xty.cand)

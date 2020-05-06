@@ -1,3 +1,10 @@
+#######################################################
+# Author: Devin Francom, Los Alamos National Laboratory
+# Protected under GPL-3 license
+# Los Alamos Computer Code release C19031
+# github.com/lanl/BASS
+#######################################################
+
 ########################################################################
 ## perform RJMCMC step (birth, death, or change)
 ########################################################################
@@ -30,7 +37,7 @@ birth_des_func<-function(curr,prior,data){
   }
 
   ## calculate log acceptance probability
-  alpha<- data$itemp.ladder[curr$temp.ind]*(.5/curr$s2*(qf.cand.list$qf-curr$qf) + log(curr$lam) - log(curr$nc) + log(data$death.prob.next/data$birth.prob) - cand.des$lbmcmp - cand.func$lbmcmp)
+  alpha<- data$itemp.ladder[curr$temp.ind]*(.5/curr$s2*(qf.cand.list$qf-curr$qf)/(1+curr$beta.prec) + log(curr$lam) - log(curr$nc) + log(data$death.prob.next/data$birth.prob) - cand.des$lbmcmp - cand.func$lbmcmp + .5*log(curr$beta.prec) - .5*log(1+curr$beta.prec))
 
   ## assign new values
   if(log(runif(1)) < alpha){
@@ -79,7 +86,7 @@ death_des_func<-function(curr,prior,data){
   }
 
   # calculate log acceptance probability
-  alpha<- data$itemp.ladder[curr$temp.ind]*(.5/curr$s2*(qf.cand.list$qf-curr$qf) - log(curr$lam) + log(data$birth.prob.last/data$death.prob) + log(curr$nbasis) + lpbmcmp)
+  alpha<- data$itemp.ladder[curr$temp.ind]*(.5/curr$s2*(qf.cand.list$qf-curr$qf)/(1+curr$beta.prec) - log(curr$lam) + log(data$birth.prob.last/data$death.prob) + log(curr$nbasis) + lpbmcmp - .5*log(curr$beta.prec) + .5*log(1+curr$beta.prec))
 
   if(log(runif(1)) < alpha){
     curr<-deleteBasis(curr,basis,ind,qf.cand.list,I.star.des,I.vec.des,z.star.des,z.vec.des)
@@ -126,7 +133,7 @@ change_des_func<-function(curr,prior,data){
     return(curr)
   }
 
-  alpha<-data$itemp.ladder[curr$temp.ind]*.5/curr$s2*(qf.cand.list$qf-curr$qf)
+  alpha<-data$itemp.ladder[curr$temp.ind]*.5/curr$s2*(qf.cand.list$qf-curr$qf)/(1+curr$beta.prec)
 
   if(log(runif(1))<alpha){
     curr<-changeBasis(curr,cand.des,basis,qf.cand.list,XtX.cand,Xty.cand)

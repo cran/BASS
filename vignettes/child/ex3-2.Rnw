@@ -1,5 +1,5 @@
 
-In this example, we use data generated from a function similar to the Friedman function in the previous example but with a categorical variable included.  The function, introduced in \cite{gramacy2010categorical}, has 
+In this example, we use data generated from a function similar to the Friedman function in the previous example but with a categorical variable included.  The function, introduced in \cite{gramacy2010categorical}, has
 \begin{align}
 f(\bx) &=
 \begin{cases}
@@ -16,12 +16,12 @@ f <- function(x) {
   as.numeric(x[, 11] == 1) * (10 * sin(pi * x[, 1] * x[, 2])) +
   as.numeric(x[ ,11] == 2) * (20 * (x[, 3] - .5)^2) +
   as.numeric(x[, 11] == 3) * (10 * x[, 4] + 5 * x[, 5]) +
-  as.numeric(x[, 11] == 4) * (10 * sin(pi * x[, 5] * x[, 4]) + 
+  as.numeric(x[, 11] == 4) * (10 * sin(pi * x[, 5] * x[, 4]) +
                     20 * (x[, 3] - .5)^2 + 10 * x[, 2] + 5 * x[, 1])
 }
 sigma <- 1
 n <- 500
-x <- data.frame(matrix(runif(n * 10), n, 10), 
+x <- data.frame(matrix(runif(n * 10), n, 10),
                 as.factor(sample(1:4, size = n, replace = T)))
 y <- rnorm(n, f(x), sigma)
 @
@@ -29,9 +29,9 @@ y <- rnorm(n, f(x), sigma)
 We fit a model with tempering and use it for prediction, as in the previous example.
 <<c3-2, cache=T, dependson='c3-1'>>=
 mod <- bass(x, y, nmcmc = 40000, nburn = 30000, thin = 10,
-            temp.ladder = (1 + .2)^(1:6 - 1), verbose = F)
+            temp.ladder = (1 + .25)^(1:9 - 1), verbose = F)
 n.test <- 1000
-x.test <- data.frame(matrix(runif(n.test * 10), n.test, 10), 
+x.test <- data.frame(matrix(runif(n.test * 10), n.test, 10),
                      as.factor(sample(1:4, size = n.test, replace = T)))
 pred <- predict(mod, x.test)
 @
@@ -50,6 +50,6 @@ sens <- sobol(mod)
 
 Plotting the posterior distributions of the most important (explaining more than 0.5\% of the variance) sensitivity indices in Figure \ref{fig:ex3plot2}, we see how important the categorical variable is as well as which variables it interacts with.
 <<ex3plot2, fig.cap='Most important main effects and interactions - Friedman function with categorical predictor.',fig.width=6*.7,fig.height=6*.7>>=
-boxplot(sens$S[, colMeans(sens$S) > .005], las = 2, 
+boxplot(sens$S[, colMeans(sens$S) > .005], las = 2,
         ylab = 'proportion variance', range = 0)
 @

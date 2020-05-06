@@ -1,3 +1,10 @@
+#######################################################
+# Author: Devin Francom, Los Alamos National Laboratory
+# Protected under GPL-3 license
+# Los Alamos Computer Code release C19031
+# github.com/lanl/BASS
+#######################################################
+
 ########################################################################
 ## main BASS function
 ########################################################################
@@ -6,7 +13,7 @@
 #'
 #' @description Fits a BASS model using RJMCMC.  Optionally uses parallel tempering to improve mixing.  Can be used with scalar or functional response.  Also can use categorical inputs.
 #' @param xx a data frame or matrix of predictors.  Categorical predictors should be included as factors.
-#' @param y a response vector (scalar response) or matrix (functional response).
+#' @param y a response vector (scalar response) or matrix (functional response).  Note: If \code{sum(y^2)} is large (i.e. \code{1e10}), please center/rescale (and rescale \code{g1} and \code{g2} if necessary).
 #' @param maxInt integer for maximum degree of interaction in spline basis functions.  Defaults to the number of predictors, which could result in overfitting.
 #' @param maxInt.func (functional response only) integer for maximum degree of interaction in spline basis functions describing the functional response.
 #' @param maxInt.cat (categorical input only) integer for maximum degree of interaction of categorical inputs.
@@ -20,6 +27,7 @@
 #' @param thin keep every \code{thin} samples
 #' @param g1 shape for IG prior on \eqn{\sigma^2}.
 #' @param g2 scale for IG prior on \eqn{\sigma^2}.
+#' @param s2.lower lower bound for s2. Turns IG prior for s2 into a truncated IG.
 #' @param h1 shape for gamma prior on \eqn{\lambda}.
 #' @param h2 rate for gamma prior on \eqn{\lambda}.  This is the primary way to control overfitting.  A large value of \code{h2} favors fewer basis functions.
 #' @param a.tau shape for gamma prior on \eqn{\tau}.
@@ -32,32 +40,32 @@
 #' @param save.yhat logical; should predictions of training data be saved?
 #' @param small logical; if true, returns a smaller object by leaving out \code{curr.list} and other unnecessary objects.  Use in combination with \code{save.yhat} to get smaller memory footprint for very large models.
 #' @param verbose logical; should progress be displayed?
+#' @param ret.str logical; return data and prior structures
 #' @details Explores BASS model space by RJMCMC.  The BASS model has \deqn{y = f(x) + \epsilon,  ~~\epsilon \sim N(0,\sigma^2)} \deqn{f(x) = a_0 + \sum_{m=1}^M a_m B_m(x)} and \eqn{B_m(x)} is a BASS basis function (tensor product of spline basis functions). We use priors \deqn{a \sim N(0,\sigma^2/\tau (B'B)^{-1})} \deqn{M \sim Poisson(\lambda)} as well as the priors mentioned in the arguments above.
 #' @return An object of class 'bass'.  The other output will only be useful to the advanced user.  Rather, users may be interested in prediction and sensitivity analysis, which are obtained by passing the entire object to the predict.bass or sobol functions.
-#' @keywords nonparametric regression, splines, functional data analysis
+#' @keywords nonparametric regression splines functional data analysis
 #' @seealso \link{predict.bass} for prediction and \link{sobol} for sensitivity analysis.
 #' @export
-#' @useDynLib BASS, .registration = TRUE
 #' @import stats
 #' @import utils
-#' @example ../examples/examples.R
+#' @example inst/examples.R
 #'
-bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,maxBasis=1000,npart=NULL,npart.func=NULL,nmcmc=10000,nburn=9000,thin=1,g1=0,g2=0,h1=10,h2=10,a.tau=1,b.tau=NULL,w1=5,w2=5,temp.ladder=NULL,start.temper=NULL,curr.list=NULL,save.yhat=TRUE,small=FALSE,verbose=TRUE){
+bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,maxBasis=1000,npart=NULL,npart.func=NULL,nmcmc=10000,nburn=9000,thin=1,g1=0,g2=0,s2.lower=0,h1=10,h2=10,a.tau=.5,b.tau=NULL,w1=5,w2=5,temp.ladder=NULL,start.temper=NULL,curr.list=NULL,save.yhat=TRUE,small=FALSE,verbose=TRUE,ret.str=F){
 
   cl<-match.call()
   ########################################################################
   ## setup
-  
+
   ## check inputs
-  
+
   if(!posInt(maxInt))
     stop('invalud maxInt')
   if(!posInt(maxInt.func))
     stop('invalud maxInt.func')
   if(!posInt(maxInt.cat))
     stop('invalud maxInt.cat')
-  if(!posInt(degree))
-    stop('invalud degree')
+  #if(!posInt(degree))
+  #  stop('invalud degree')
   if(!is.null(npart)){
     if(!posInt(npart))
       stop('invalud npart')
@@ -84,11 +92,13 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
     stop('g1 and g2 must be greater than or equal to 0')
   if(any(c(h1,h2,a.tau,b.tau,w1,w2)<=0))
     stop('h1,h2,a.tau,b.tau,w1,w2 must be greater than 0')
-  
+  if(s2.lower<0)
+    stop('s2.lower must be >= 0')
+
   ## process data
   if(any(is.na(xx)) | any(is.na(y)))
     stop('Current version does not allow missing data')
-  
+
   y<-as.matrix(y)
   xx<-as.data.frame(xx)
   dx<-dim(xx)
@@ -131,7 +141,7 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
     if(dx[1]==dxf[1]) # this is dangerous because we would automatically correct it if we could tell it was wrong, but can't tell if it is wrong here
       warning('Possible dimension problem: make sure rows of y correspond to functional data')
   }
-  
+
   des<-T
   cx<-sapply(xx,class)
   cx.factor<- cx == 'factor'
@@ -166,7 +176,7 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
   # so cases are des, cat, des_cat, des_func, cat_func, des_cat_func
 
   ## handle tempering arguements
-  
+
   if(is.null(temp.ladder)){
     temp.ladder<-1
   }
@@ -238,8 +248,8 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
   data$birth.prob.last<-1/3
   data$death.prob<-1/3
   data$itemp.ladder<-1/temp.ladder
-  
-  
+
+
   ## make a prior object
 
   npart.des<-npart
@@ -249,7 +259,7 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
   if(is.null(npart.func) & func){
     npart.func<-min(20,.1*data$nfunc)
   }
-  
+
   maxBasis<-min(maxBasis,data$n) # can't have more basis functions than data points
   maxInt.des<-min(maxInt,pdes) # can't have more interactions than variables
   maxInt.cat<-min(maxInt.cat,pcat)
@@ -267,9 +277,10 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
   prior$h2<-h2
   prior$g1<-g1
   prior$g2<-g2
+  prior$s2.lower<-s2.lower
   prior$a.beta.prec<-a.tau
   if(is.null(b.tau)){
-    prior$b.beta.prec<-1/data$n
+    prior$b.beta.prec<-2/data$n
   } else{
   prior$b.beta.prec<-b.tau
   }
@@ -279,9 +290,9 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
     prior$minInt<-1
   prior$miC<-abs(prior$minInt-1)
 
-  
+
   ## make an object to store current MCMC state (one for each temperature)
-  
+
   if(is.null(curr.list)){
     curr.list<-list()
     for(i in 1:ntemps){
@@ -357,10 +368,10 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
   funcs$death<-eval(parse(text=paste('death',type,sep='')))
   funcs$change<-eval(parse(text=paste('change',type,sep='')))
   funcs$getYhat<-eval(parse(text=paste('getYhat',type,sep='')))
-  
-  
+
+
   ## prepare storage objects for mcmc draws
-  
+
   nmod.max<-(nmcmc-nburn)/thin # max number of models (models don't necessarily change every iteration)
   if(des){
     signs.des<-knotInd.des<-vars.des<-array(dim=c(nmod.max,maxBasis,maxInt.des)) # truncate when returning at end of function
@@ -392,7 +403,7 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
   # temperature index
   cold.chain<-1 # to start, the cold chain is curr.list[[1]]
   temp.ind<-1:ntemps # we will change this vector as we swap temperatures
-  count.swap<-count.swap.prop<-rep(0,ntemps-1) # number of swaps between each set of neighbors
+  count.swap<-count.swap1000<-count.swap.prop<-rep(0,ntemps-1) # number of swaps between each set of neighbors
   swap<-NA # to keep track of swaps
   #require(parallel) # for tempering
 
@@ -400,20 +411,22 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
   ########################################################################
   ## MCMC
 
+
   if(verbose)
     cat('MCMC Start',myTimestamp(),'nbasis:',curr.list[[cold.chain]]$nbasis,'\n')
   n.models<-keep.sample<-0 # indexes for storage
   for(i in 2:nmcmc){
 
     ## update model for each temperature - can be parallel
-    
+
+    curr.list<-lapply(curr.list,updateMCMC,prior=prior,data=data,funcs=funcs)
     #curr.list<-parLapply(cluster,curr.list,updateMCMC)
     #curr.list<-parallel::mclapply(curr.list,updateMCMC,prior=prior,data=data,funcs=funcs,mc.preschedule=T,mc.cores=1)
-    curr.list<-lapply(curr.list,updateMCMC,prior=prior,data=data,funcs=funcs)
+    #curr.list<-parLapplyLB(cl,curr.list,updateMCMC,prior=prior,data=data,funcs=funcs)
     # TODO: DO SOMETHING LIKE THIS BUT KEEP EVERYTHING SEPARATE ON THE CLUSTER, all we need is lpost, cmod - MPI
-    
+
     ## parallel tempering swap
-    
+
     if(i>start.temper){# & (i%%20==0)){ #only start after a certain point, and only try every 20
       # sample temp.ind.swap from 1:(ntemps-1), then swap with temp.ind.swap+1
       temp.ind.swap1<-sample(1:(ntemps-1),size=1) # corresponds to temperature temp.ladder[temp.ind.swap1]
@@ -435,6 +448,7 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
         curr.list[[chain.ind2]]$temp.ind<-temp.ind.swap1
 
         count.swap[temp.ind.swap1]<-count.swap[temp.ind.swap1]+1
+        count.swap1000[temp.ind.swap1]<-count.swap1000[temp.ind.swap1]+1
         swap[i]<-temp.ind.swap1
         if(temp.ind.swap1==1){
           cmod<-T # we changed models
@@ -500,8 +514,10 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
     if(verbose & i%%1000==0){
       pr<-c('MCMC iteration',i,myTimestamp(),'nbasis:',curr.list[[cold.chain]]$nbasis)
       if(i>start.temper)
-        pr<-c(pr,'tempering acc',round(count.swap/count.swap.prop,3)) # swap acceptance rate
+        pr<-c(pr,'tempering acc',round(count.swap1000/1000*(ntemps-1),3)) # swap acceptance rate
+        #pr<-c(pr,'tempering acc',round(count.swap/count.swap.prop,3)) # swap acceptance rate
       cat(pr,'\n')
+      count.swap1000<-rep(0,ntemps-1)
     }
 
   }
@@ -511,8 +527,11 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
 
   out.yhat<-list()
   if(save.yhat){
-    out.yhat<-list(yhat.mean=yhat.sum/nmod.max,yhat=yhat,y=y)
+    out.yhat<-list(yhat.mean=yhat.sum/nmod.max,yhat=yhat)
   }
+  out.str<-list()
+  if(ret.str)
+    out.str<-list(data=data,prior=prior,funcs=funcs)
 
   out<-list(
        call=cl,
@@ -541,8 +560,8 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
     out$curr.list<-curr.list # for restarting
   }
   mb<-max(nbasis)
-  
-  
+
+
   out.des<-list()
   if(des){
     out.des<-list(
@@ -595,7 +614,7 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
   }
 
   #stopCluster(cluster)
-  ret<-c(out.yhat,out,out.des,out.cat,out.func)
+  ret<-c(out.yhat,out,out.des,out.cat,out.func,out.str)
   class(ret)<-'bass'
   return(ret)
 }

@@ -1,14 +1,34 @@
+#######################################################
+# Author: Devin Francom, Los Alamos National Laboratory
+# Protected under GPL-3 license
+# Los Alamos Computer Code release C19031
+# github.com/lanl/BASS
+#######################################################
+
 ########################################################################
 ## miscellaneous functions
 ########################################################################
 
 ## sample a tempered gamma
-rgammaTemper<-function(n,shape,rate,itemper){ 
+rgammaTemper<-function(n,shape,rate,itemper){
   rgamma(n,itemper*(shape-1)+1,itemper*rate)
 }
 ## sample a tempered IG
-rigammaTemper<-function(n,shape,scale,itemper){ 
+rigammaTemper<-function(n,shape,scale,itemper){
   1/rgamma(n,itemper*(shape+1)-1,rate=itemper*scale)
+}
+
+## sample a truncated tempered IG
+rtigammaTemper<-function(n,shape,scale,itemper,lower){
+  1/rtgamma(n,1/lower,itemper*(shape+1)-1,rate=itemper*scale)
+}
+
+## sample from an upper-truncated gamma
+rtgamma<-function(n,upper,shape,rate){
+  out<-rep(upper,n)
+  if(pgamma(upper,shape=shape,rate=rate)>0) # if cdf at upper bound is positive, sample, otherwise use upper bound
+    out<-truncdist::rtrunc(n,'gamma',b=upper,shape=shape,rate=rate)
+  return(out)
 }
 
 ## scale a vector to be between 0 and 1
@@ -42,6 +62,13 @@ getYhat_cat_func<-function(curr,nb){
 }
 getYhat_des_cat_func<-function(curr,nb){
   tcrossprod(curr$dc.basis%*%diag(c(curr$beta),nb+1),curr$func.basis)
+}
+
+getYhat_des2<-function(des.basis,beta){
+  des.basis%*%beta
+}
+getYhat_des_func2<-function(des.basis,func.basis,beta){
+  tcrossprod(des.basis%*%diag(beta),func.basis)
 }
 
 ## for checking inputs

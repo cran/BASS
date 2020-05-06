@@ -1,3 +1,10 @@
+#######################################################
+# Author: Devin Francom, Los Alamos National Laboratory
+# Protected under GPL-3 license
+# Los Alamos Computer Code release C19031
+# github.com/lanl/BASS
+#######################################################
+
 ########################################################################
 ## perform RJMCMC step (birth, death, or change)
 ########################################################################
@@ -5,7 +12,7 @@ birth_des_cat_func<-function(curr,prior,data){
 
   cand.des<-genCandBasis(minInt=prior$minInt,maxInt=prior$maxInt.des,I.vec=curr$I.vec.des,z.vec=curr$z.vec.des,p=data$pdes,xxt=data$xxt.des,q=prior$q,xx.unique.ind=data$unique.ind.des,vars.len=data$vars.len.des,prior)
   cand.cat<-genCandBasisCat(minInt=prior$minInt,maxInt=prior$maxInt.cat,I.vec=curr$I.vec.cat,z.vec=curr$z.vec.cat,p=data$pcat,xx=data$xx.cat,nlevels=data$nlevels,levels=data$levels,prior)
-  
+
   dc<-cand.des$basis*cand.cat$basis
   if(sum(dc!=0)<prior$npart.des)
       return(curr)
@@ -33,7 +40,7 @@ birth_des_cat_func<-function(curr,prior,data){
   }
 
   ## calculate log acceptance probability
-  alpha<- data$itemp.ladder[curr$temp.ind]*(.5/curr$s2*(qf.cand.list$qf-curr$qf) + log(curr$lam) - log(curr$nc) + log(data$death.prob.next/data$birth.prob) - cand.des$lbmcmp - cand.cat$lbmcmp - cand.func$lbmcmp)
+  alpha<- data$itemp.ladder[curr$temp.ind]*(.5/curr$s2*(qf.cand.list$qf-curr$qf)/(1+curr$beta.prec) + log(curr$lam) - log(curr$nc) + log(data$death.prob.next/data$birth.prob) - cand.des$lbmcmp - cand.cat$lbmcmp - cand.func$lbmcmp + .5*log(curr$beta.prec) - .5*log(1+curr$beta.prec))
 
   ## assign new values
   if(log(runif(1)) < alpha){
@@ -57,7 +64,7 @@ death_des_cat_func<-function(curr,prior,data){
   if(!fullRank){
     return(curr) # TODO: not sure why I need this, I shouldn't need it in theory
   }
-  
+
   I.star.des<-curr$I.star.des
   I.star.des[curr$n.int.des[basis]+1]<-I.star.des[curr$n.int.des[basis]+1]-1
   I.vec.des<-I.star.des/sum(I.star.des)
@@ -65,7 +72,7 @@ death_des_cat_func<-function(curr,prior,data){
   if(curr$n.int.des[basis]>0)
     z.star.des[curr$vars.des[basis,1:curr$n.int.des[basis]]]<-z.star.des[curr$vars.des[basis,1:curr$n.int.des[basis]]]-1
   z.vec.des<-z.star.des/sum(z.star.des)
-  
+
   I.star.cat<-curr$I.star.cat
   I.star.cat[curr$n.int.cat[basis]+1]<-I.star.cat[curr$n.int.cat[basis]+1]-1
   I.vec.cat<-I.star.cat/sum(I.star.cat)
@@ -86,7 +93,7 @@ death_des_cat_func<-function(curr,prior,data){
   if(curr$n.int.des[basis]>0){
     lpbmcmp<-lpbmcmp+logProbChangeMod(curr$n.int.des[basis],curr$vars.des[basis,1:curr$n.int.des[basis]],I.vec.des,z.vec.des,data$pdes,data$vars.len.des,prior$maxInt.des,prior$miC)
   }
-  
+
   if(curr$n.int.cat[basis]>0){
     lpbmcmp<-lpbmcmp+logProbChangeModCat(curr$n.int.cat[basis],curr$vars.cat[basis,1:curr$n.int.cat[basis]],I.vec.cat,z.vec.cat,data$pcat,data$nlevels,curr$sub.size[basis,],prior$maxInt.cat,prior$miC)
   }
@@ -96,7 +103,7 @@ death_des_cat_func<-function(curr,prior,data){
   }
 
   # calculate log acceptance probability
-  alpha<- data$itemp.ladder[curr$temp.ind]*(.5/curr$s2*(qf.cand.list$qf-curr$qf) - log(curr$lam) + log(data$birth.prob.last/data$death.prob) + log(curr$nbasis) + lpbmcmp)
+  alpha<- data$itemp.ladder[curr$temp.ind]*(.5/curr$s2*(qf.cand.list$qf-curr$qf)/(1+curr$beta.prec) - log(curr$lam) + log(data$birth.prob.last/data$death.prob) + log(curr$nbasis) + lpbmcmp - .5*log(curr$beta.prec) + .5*log(1+curr$beta.prec))
 
   if(log(runif(1)) < alpha){
     curr<-deleteBasis(curr,basis,ind,qf.cand.list,I.star.des,I.vec.des,z.star.des,z.vec.des)
@@ -134,7 +141,7 @@ change_des_cat_func<-function(curr,prior,data){
   }
 
   dc<-cand.cat$basis*cand.des$basis
-  
+
   if(sum(dc!=0)<prior$npart.des){
     return(curr)
   }
@@ -155,7 +162,7 @@ change_des_cat_func<-function(curr,prior,data){
     return(curr)
   }
 
-  alpha<-data$itemp.ladder[curr$temp.ind]*.5/curr$s2*(qf.cand.list$qf-curr$qf)
+  alpha<-data$itemp.ladder[curr$temp.ind]*.5/curr$s2*(qf.cand.list$qf-curr$qf)/(1+curr$beta.prec)
 
   if(log(runif(1))<alpha){
     curr<-changeBasis(curr,cand.des,basis,qf.cand.list,XtX.cand,Xty.cand)

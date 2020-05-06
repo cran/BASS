@@ -4,17 +4,42 @@
 \alias{bass}
 \title{Bayesian Adaptive Spline Surfaces (BASS)}
 \usage{
-bass(xx, y, maxInt = 3, maxInt.func = 3, maxInt.cat = 3, xx.func = NULL,
-  degree = 1, maxBasis = 1000, npart = NULL, npart.func = NULL,
-  nmcmc = 10000, nburn = 9000, thin = 1, g1 = 0, g2 = 0, h1 = 10,
-  h2 = 10, a.tau = 1, b.tau = NULL, w1 = 5, w2 = 5,
-  temp.ladder = NULL, start.temper = NULL, curr.list = NULL,
-  save.yhat = TRUE, small = FALSE, verbose = TRUE)
+bass(
+  xx,
+  y,
+  maxInt = 3,
+  maxInt.func = 3,
+  maxInt.cat = 3,
+  xx.func = NULL,
+  degree = 1,
+  maxBasis = 1000,
+  npart = NULL,
+  npart.func = NULL,
+  nmcmc = 10000,
+  nburn = 9000,
+  thin = 1,
+  g1 = 0,
+  g2 = 0,
+  s2.lower = 0,
+  h1 = 10,
+  h2 = 10,
+  a.tau = 0.5,
+  b.tau = NULL,
+  w1 = 5,
+  w2 = 5,
+  temp.ladder = NULL,
+  start.temper = NULL,
+  curr.list = NULL,
+  save.yhat = TRUE,
+  small = FALSE,
+  verbose = TRUE,
+  ret.str = F
+)
 }
 \arguments{
 \item{xx}{a data frame or matrix of predictors.  Categorical predictors should be included as factors.}
 
-\item{y}{a response vector (scalar response) or matrix (functional response).}
+\item{y}{a response vector (scalar response) or matrix (functional response).  Note: If \code{sum(y^2)} is large (i.e. \code{1e10}), please center/rescale (and rescale \code{g1} and \code{g2} if necessary).}
 
 \item{maxInt}{integer for maximum degree of interaction in spline basis functions.  Defaults to the number of predictors, which could result in overfitting.}
 
@@ -42,6 +67,8 @@ bass(xx, y, maxInt = 3, maxInt.func = 3, maxInt.cat = 3, xx.func = NULL,
 
 \item{g2}{scale for IG prior on \eqn{\sigma^2}.}
 
+\item{s2.lower}{lower bound for s2. Turns IG prior for s2 into a truncated IG.}
+
 \item{h1}{shape for gamma prior on \eqn{\lambda}.}
 
 \item{h2}{rate for gamma prior on \eqn{\lambda}.  This is the primary way to control overfitting.  A large value of \code{h2} favors fewer basis functions.}
@@ -65,6 +92,8 @@ bass(xx, y, maxInt = 3, maxInt.func = 3, maxInt.cat = 3, xx.func = NULL,
 \item{small}{logical; if true, returns a smaller object by leaving out \code{curr.list} and other unnecessary objects.  Use in combination with \code{save.yhat} to get smaller memory footprint for very large models.}
 
 \item{verbose}{logical; should progress be displayed?}
+
+\item{ret.str}{logical; return data and prior structures}
 }
 \value{
 An object of class 'bass'.  The other output will only be useful to the advanced user.  Rather, users may be interested in prediction and sensitivity analysis, which are obtained by passing the entire object to the predict.bass or sobol functions.
@@ -153,5 +182,5 @@ mod<-bass(1:2,1:2,nmcmc=2,nburn=1)
 \keyword{data}
 \keyword{functional}
 \keyword{nonparametric}
-\keyword{regression,}
-\keyword{splines,}
+\keyword{regression}
+\keyword{splines}
