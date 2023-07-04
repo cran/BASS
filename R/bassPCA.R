@@ -65,21 +65,21 @@ bassPCAsetup<-function(xx,y,n.pc=NULL,perc.var=99,center=T,scale=F){
       warning('n.pc too large, using all PCs intead')
   }
 
-  if(class(center)=='logical' & length(center)==1){
+  if(inherits(center,'logical') & length(center)==1){
     y.m<-colMeans(y)
     if(!center)
       y.m<-rep(0,ncol(y))
-  } else if(class(center)=='numeric' & length(center)==ncol(y)){
+  } else if(inherits(center,'numeric') & length(center)==ncol(y)){
     y.m<-center
   } else{
     stop("center parameter wrong dimension")
   }
 
-  if(class(scale)=='logical' & length(scale)==1){
+  if(inherits(scale,'logical') & length(scale)==1){
     y.s<-apply(y,2,sd)
     if(!scale)
       y.s<-rep(1,ncol(y))
-  } else if(class(scale)=='numeric' & length(scale)==ncol(y)){
+  } else if(inherits(scale,'numeric') & length(scale)==ncol(y)){
     y.s<-scale
   } else{
     stop("scale parameter wrong dimension")
@@ -367,11 +367,12 @@ sobolBasis<-function(mod,int.order,prior=NULL,mcmc.use=NULL,nind=NULL,n.cores=1,
       if(is.null(prior[[i]]$trunc)){
         prior[[i]]$trunc<-c(0,1)
       } else{
-        prior[[i]]$trunc<-scale.range(prior[[i]]$trunc,bassMod$range.des[,i])
+        #browser()
+        prior[[i]]$trunc<-scale_range(prior[[i]]$trunc,bassMod$range.des[,i])
       }
 
       if(prior[[i]]$dist %in% c('normal','student')){
-        prior[[i]]$mean<-scale.range(prior[[i]]$mean,bassMod$range.des[,i])
+        prior[[i]]$mean<-scale_range(prior[[i]]$mean,bassMod$range.des[,i])
         prior[[i]]$sd<-prior[[i]]$sd/(bassMod$range.des[2,i]-bassMod$range.des[1,i])
         if(prior[[i]]$dist == 'normal'){
           prior[[i]]$z<-pnorm((prior[[i]]$trunc[2]-prior[[i]]$mean)/prior[[i]]$sd) - pnorm((prior[[i]]$trunc[1]-prior[[i]]$mean)/prior[[i]]$sd)
@@ -850,103 +851,6 @@ get.f0<-function(prior,pc.mod,pc,mcmc.use){ # mcmc.mod.use is mcmc index not mod
 
 
 
-##################################################################################################################################################################
-##################################################################################################################################################################
-## modularized calibration
-rmnorm<-function(mu, S){
-  mu+c(rnorm(length(mu))%*%chol(S))
-}
-calibrate.bassBasis<-function(mod,y,a,b,nmcmc,verbose=T){ # assumes inputs to mod are standardized to (0,1), equal variance for all y values (should change to sim covariance)
-  p<-ncol(mod$dat$xx)
-  ny<-length(y)
-  ns<-mod$mod.list[[1]]$nmcmc-mod$mod.list[[1]]$nburn # number of emu mcmc samples
-
-  theta<-matrix(nrow=nmcmc,ncol=p)
-  s2<-rep(NA,nmcmc)
-
-#browser()
-  theta[1,]<-.5
-  pred.curr<-predict(mod,theta[1,,drop=F],mcmc.use=sample(ns,size=1),trunc.error=F)
-  s2[1]<-1/rgamma(1,ny/2+a,b+sum((y-pred.curr)^2))
-
-  eps<-1e-10
-  cc<-2.4^2/p
-  S<-diag(p)*eps
-  count<-0
-  for(i in 2:nmcmc){
-    s2[i]<-1/rgamma(1,ny/2+a,b+sum((y-pred.curr)^2))
-
-    theta[i,]<-theta[i-1,]
-    if(i>300){
-      mi<-1#max(1,i-300)
-      S<-cov(theta[mi:(i-1),])*cc+diag(eps*cc,p)
-    }
-    theta.cand<-rmnorm(theta[i-1,],S)
-    if(any(theta.cand<0 | theta.cand>1))
-      alpha<- -9999
-    else{
-      pred.cand<-predict(mod,t(theta.cand),mcmc.use=sample(ns,size=1),trunc.error=F)
-      alpha<- -.5/s2[i]*(sum((y-pred.cand)^2)-sum((y-pred.curr)^2))
-    }
-    if(log(runif(1))<alpha){
-      theta[i,]<-theta.cand
-      count<-count+1
-    }
-
-    pred.curr<-predict(mod,theta[i,,drop=F],mcmc.use=sample(ns,size=1),trunc.error=F)
-
-    if(verbose & i%%100==0){
-      pr<-c('MCMC iteration',i,myTimestamp(),'count:',count)
-      cat(pr,'\n')
-    }
-  }
-
-  return(list(theta=theta,s2=s2,count=count))
-}
-
-
-
-calibrateIndep.bassBasis<-function(mod,y,a,b,nmcmc,verbose=T){ # assumes inputs to mod are standardized to (0,1), equal variance for all y values (should change to sim covariance)
-  p<-ncol(mod$dat$xx)
-  ny<-length(y)
-  ns<-mod$mod.list[[1]]$nmcmc-mod$mod.list[[1]]$nburn # number of emu mcmc samples
-
-  theta<-matrix(nrow=nmcmc,ncol=p)
-  s2<-rep(NA,nmcmc)
-
-  #browser()
-  theta[1,]<-.5
-  pred.curr<-predict(mod,theta[1,,drop=F],mcmc.use=sample(ns,size=1),trunc.error=F)
-  s2[1]<-1/rgamma(1,ny/2+a,b+sum((y-pred.curr)^2))
-
-  count<-rep(0,p)
-  for(i in 2:nmcmc){
-    s2[i]<-1/rgamma(1,ny/2+a,b+sum((y-pred.curr)^2))
-
-    theta[i,]<-theta[i-1,]
-
-    for(j in 1:p){
-      theta.cand<-theta[i,]
-      theta.cand[j]<-runif(1)
-      pred.cand<-predict(mod,t(theta.cand),mcmc.use=sample(ns,size=1),trunc.error=F)
-      alpha<- -.5/s2[i]*(sum((y-pred.cand)^2)-sum((y-pred.curr)^2))
-      if(log(runif(1))<alpha){
-        theta[i,]<-theta.cand
-        count[j]<-count[j]+1
-      }
-    }
-
-    pred.curr<-predict(mod,theta[i,,drop=F],mcmc.use=sample(ns,size=1),trunc.error=F)
-
-    if(verbose & i%%100==0){
-      pr<-c('MCMC iteration',i,myTimestamp(),'count:',count)
-      cat(pr,'\n')
-    }
-  }
-
-  return(list(theta=theta,s2=s2,count=count))
-}
-
 
 
 ##################################################################################################################################################################
@@ -954,7 +858,7 @@ calibrateIndep.bassBasis<-function(mod,y,a,b,nmcmc,verbose=T){ # assumes inputs 
 
 
 
-plot.prior<-function(prior,plot=TRUE,n=1000,...){
+plot_prior<-function(prior,plot=TRUE,n=1000,...){
   xx<-seq(prior$trunc[1],prior$trunc[2],length.out=n)
   if(prior$dist=='uniform'){
     out<-dunif(xx,prior$trunc[1],prior$trunc[2])

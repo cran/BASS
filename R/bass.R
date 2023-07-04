@@ -34,6 +34,7 @@
 #' @param b.tau rate for gamma prior on \eqn{\tau}. Defaults to one over the number of observations, which centers the prior for the basis function weights on the unit information prior.
 #' @param w1 nominal weight for degree of interaction, used in generating candidate basis functions.  Should be greater than 0.
 #' @param w2 nominal weight for variables, used in generating candidate basis functions.  Should be greater than 0.
+#' @param beta.prior what type of prior to use for basis coefficients, "g" or "jeffreys"
 #' @param temp.ladder temperature ladder used for parallel tempering.  The first value should be 1 and the values should increase.
 #' @param start.temper when to start tempering (after how many MCMC iterations). Defaults to 1000 or half of burn-in, whichever is smaller.
 #' @param curr.list list of starting models (one element for each temperature), could be output from a previous run under the same model setup.
@@ -50,7 +51,7 @@
 #' @import utils
 #' @example inst/examples.R
 #'
-bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,maxBasis=1000,npart=NULL,npart.func=NULL,nmcmc=10000,nburn=9000,thin=1,g1=0,g2=0,s2.lower=0,h1=10,h2=10,a.tau=.5,b.tau=NULL,w1=5,w2=5,temp.ladder=NULL,start.temper=NULL,curr.list=NULL,save.yhat=TRUE,small=FALSE,verbose=TRUE,ret.str=F){
+bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,maxBasis=1000,npart=NULL,npart.func=NULL,nmcmc=10000,nburn=9000,thin=1,g1=0,g2=0,s2.lower=0,h1=10,h2=10,a.tau=.5,b.tau=NULL,w1=5,w2=5,beta.prior='g',temp.ladder=NULL,start.temper=NULL,curr.list=NULL,save.yhat=TRUE,small=FALSE,verbose=TRUE,ret.str=F){
 
   cl<-match.call()
   ########################################################################
@@ -59,31 +60,31 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
   ## check inputs
 
   if(!posInt(maxInt))
-    stop('invalud maxInt')
+    stop('invalid maxInt')
   if(!posInt(maxInt.func))
-    stop('invalud maxInt.func')
+    stop('invalid maxInt.func')
   if(!posInt(maxInt.cat))
-    stop('invalud maxInt.cat')
+    stop('invalid maxInt.cat')
   #if(!posInt(degree))
-  #  stop('invalud degree')
+  #  stop('invalid degree')
   if(!is.null(npart)){
     if(!posInt(npart))
-      stop('invalud npart')
+      stop('invalid npart')
   }
   if(!is.null(npart.func)){
     if(!posInt(npart.func))
-      stop('invalud npart.func')
+      stop('invalid npart.func')
   }
   if(!is.null(start.temper)){
     if(!posInt(start.temper))
-      stop('invalud start.temper')
+      stop('invalid start.temper')
   }
   if(!posInt(nmcmc))
-    stop('invalud nmcmc')
-  if(!posInt(nburn))
-    stop('invalud nburn')
+    stop('invalid nmcmc')
+  #if(!posInt(nburn))
+  #  stop('invalid nburn')
   if(!posInt(thin))
-    stop('invalud thin')
+    stop('invalid thin')
   if(nburn>=nmcmc)
     stop('nmcmc must be greater than nburn')
   if(thin>(nmcmc-nburn))
@@ -134,7 +135,7 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
       stop('dimension mismatch between xx.func and y')
     pfunc<-dxf[2]
     range.func<-apply(xx.func,2,range)
-    xx.func<-apply(xx.func,2,scale.range)
+    xx.func<-apply(xx.func,2,scale_range)
   }
 
   if(func){
@@ -158,7 +159,7 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
   }
   if(des){
     range.des<-apply(xx.des,2,range)
-    xx.des<-apply(xx.des,2,scale.range)
+    xx.des<-apply(xx.des,2,scale_range)
   }
   des.vars<-which(!cx.factor)
   cat.vars<-which(cx.factor)
@@ -172,6 +173,9 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
     type<-paste(type,'cat',sep='_')
   if(func)
     type<-paste(type,'func',sep='_')
+
+
+
 
   # so cases are des, cat, des_cat, des_func, cat_func, des_cat_func
 
@@ -289,6 +293,8 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
   if(des+cat+func==1) # if there is only one part, can't have minInt of 0
     prior$minInt<-1
   prior$miC<-abs(prior$minInt-1)
+  prior$beta.gprior.ind<-as.numeric(beta.prior=='g')
+  prior$beta.jprior.ind<-as.numeric(beta.prior=='jeffreys')
 
 
   ## make an object to store current MCMC state (one for each temperature)
@@ -325,7 +331,7 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
 
       curr.list[[i]]$s2<-1
       curr.list[[i]]$lam<-1
-      curr.list[[i]]$beta.prec<-1
+      curr.list[[i]]$beta.prec<-1*prior$beta.gprior.ind
       curr.list[[i]]$nbasis<-0
       curr.list[[i]]$nc<-1
 
@@ -427,32 +433,65 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
 
     ## parallel tempering swap
 
+    # if(i>start.temper){# & (i%%20==0)){ #only start after a certain point, and only try every 20
+    #   # sample temp.ind.swap from 1:(ntemps-1), then swap with temp.ind.swap+1
+    #   temp.ind.swap1<-sample(1:(ntemps-1),size=1) # corresponds to temperature temp.ladder[temp.ind.swap1]
+    #   temp.ind.swap2<-temp.ind.swap1+1 # always use the neighboring chain on the right
+    #   chain.ind1<-which(temp.ind==temp.ind.swap1) # which chain has temperature temp.ladder[temp.ind.swap1]
+    #   chain.ind2<-which(temp.ind==temp.ind.swap2)
+    #   alpha.swap<-(data$itemp.ladder[temp.ind.swap1]-data$itemp.ladder[temp.ind.swap2])*(curr.list[[chain.ind2]]$lpost-curr.list[[chain.ind1]]$lpost)
+    #   if(is.nan(alpha.swap) | is.na(alpha.swap)){
+    #     alpha.swap<- -9999
+    #     warning('large values of temp.ladder too large')
+    #   }
+    #   count.swap.prop[temp.ind.swap1]<-count.swap.prop[temp.ind.swap1]+1
+    #   #browser()
+    #   if(log(runif(1)) < alpha.swap){
+    #     # swap temperatures
+    #     temp.ind[chain.ind1]<-temp.ind.swap2
+    #     temp.ind[chain.ind2]<-temp.ind.swap1
+    #     curr.list[[chain.ind1]]$temp.ind<-temp.ind.swap2
+    #     curr.list[[chain.ind2]]$temp.ind<-temp.ind.swap1
+    #
+    #     count.swap[temp.ind.swap1]<-count.swap[temp.ind.swap1]+1
+    #     count.swap1000[temp.ind.swap1]<-count.swap1000[temp.ind.swap1]+1
+    #     swap[i]<-temp.ind.swap1
+    #     if(temp.ind.swap1==1){
+    #       cmod<-T # we changed models
+    #       cold.chain<-chain.ind2 #which(temp.ind==1)
+    #     }
+    #   }
+    # }
+
     if(i>start.temper){# & (i%%20==0)){ #only start after a certain point, and only try every 20
       # sample temp.ind.swap from 1:(ntemps-1), then swap with temp.ind.swap+1
-      temp.ind.swap1<-sample(1:(ntemps-1),size=1) # corresponds to temperature temp.ladder[temp.ind.swap1]
-      temp.ind.swap2<-temp.ind.swap1+1 # always use the neighboring chain on the right
-      chain.ind1<-which(temp.ind==temp.ind.swap1) # which chain has temperature temp.ladder[temp.ind.swap1]
-      chain.ind2<-which(temp.ind==temp.ind.swap2)
-      alpha.swap<-(data$itemp.ladder[temp.ind.swap1]-data$itemp.ladder[temp.ind.swap2])*(curr.list[[chain.ind2]]$lpost-curr.list[[chain.ind1]]$lpost)
-      if(is.nan(alpha.swap) | is.na(alpha.swap)){
-        alpha.swap<- -9999
-        warning('large values of temp.ladder too large')
-      }
-      count.swap.prop[temp.ind.swap1]<-count.swap.prop[temp.ind.swap1]+1
-      #browser()
-      if(log(runif(1)) < alpha.swap){
-        # swap temperatures
-        temp.ind[chain.ind1]<-temp.ind.swap2
-        temp.ind[chain.ind2]<-temp.ind.swap1
-        curr.list[[chain.ind1]]$temp.ind<-temp.ind.swap2
-        curr.list[[chain.ind2]]$temp.ind<-temp.ind.swap1
+      for(dummy in 1:ntemps){
+        ts<-sort(sample(1:ntemps,size=2))
+        temp.ind.swap1<-ts[1]#sample(1:(ntemps-1),size=1) # corresponds to temperature temp.ladder[temp.ind.swap1]
+        temp.ind.swap2<-ts[2]#temp.ind.swap1+1 # always use the neighboring chain on the right
+        chain.ind1<-which(temp.ind==temp.ind.swap1) # which chain has temperature temp.ladder[temp.ind.swap1]
+        chain.ind2<-which(temp.ind==temp.ind.swap2)
+        alpha.swap<-(data$itemp.ladder[temp.ind.swap1]-data$itemp.ladder[temp.ind.swap2])*(curr.list[[chain.ind2]]$lpost-curr.list[[chain.ind1]]$lpost)
+        if(is.nan(alpha.swap) | is.na(alpha.swap)){
+          alpha.swap<- -9999
+          warning('large values of temp.ladder too large')
+        }
+        count.swap.prop[temp.ind.swap1]<-count.swap.prop[temp.ind.swap1]+1
+        #browser()
+        if(log(runif(1)) < alpha.swap){
+          # swap temperatures
+          temp.ind[chain.ind1]<-temp.ind.swap2
+          temp.ind[chain.ind2]<-temp.ind.swap1
+          curr.list[[chain.ind1]]$temp.ind<-temp.ind.swap2
+          curr.list[[chain.ind2]]$temp.ind<-temp.ind.swap1
 
-        count.swap[temp.ind.swap1]<-count.swap[temp.ind.swap1]+1
-        count.swap1000[temp.ind.swap1]<-count.swap1000[temp.ind.swap1]+1
-        swap[i]<-temp.ind.swap1
-        if(temp.ind.swap1==1){
-          cmod<-T # we changed models
-          cold.chain<-chain.ind2 #which(temp.ind==1)
+          count.swap[temp.ind.swap1]<-count.swap[temp.ind.swap1]+1
+          count.swap1000[temp.ind.swap1]<-count.swap1000[temp.ind.swap1]+1
+          swap[i]<-temp.ind.swap1
+          if(temp.ind.swap1==1){
+            cmod<-T # we changed models
+            cold.chain<-chain.ind2 #which(temp.ind==1)
+          }
         }
       }
     }
@@ -510,6 +549,11 @@ bass<-function(xx,y,maxInt=3,maxInt.func=3,maxInt.cat=3,xx.func=NULL,degree=1,ma
       }
       model.lookup[keep.sample]<-n.models # update lookup table
     }
+
+    #if(calibrate){
+    #  theta[i,]<-sampleTheta(curr.list[[cold.chain]])
+    #  delta[i,]<-sampleDelta(curr.list[[cold.chain]])
+    #}
 
     if(verbose & i%%1000==0){
       pr<-c('MCMC iteration',i,myTimestamp(),'nbasis:',curr.list[[cold.chain]]$nbasis)

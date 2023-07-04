@@ -39,7 +39,7 @@
 #' # See examples in bass documentation.
 #'
 sobol<-function(bassMod,prior=NULL,prior.func=NULL,mcmc.use=NULL,func.var=NULL,xx.func.var=NULL,verbose=TRUE,getEffects=FALSE){
-  if(class(bassMod)!='bass')
+  if(!inherits(bassMod,'bass'))
     stop('First input needs to be a bass object')
   if(bassMod$p==1 & !bassMod$func)
     stop('Sobol only used for multiple input models')
@@ -112,13 +112,13 @@ sobol<-function(bassMod,prior=NULL,prior.func=NULL,mcmc.use=NULL,func.var=NULL,x
         prior[[i]]$trunc<-bassMod$range.des[,i]#c(0,1)
       }
 
-      prior[[i]]$trunc<-scale.range(prior[[i]]$trunc,bassMod$range.des[,i])
+      prior[[i]]$trunc<-scale_range(prior[[i]]$trunc,bassMod$range.des[,i])
       if(prior[[i]]$trunc[1]<0 | prior[[i]]$trunc[2]>1)
         warning('truncation range larger than training range...it is unwise to ask an emulator to extrapolate.')
       #browser()
 
       if(prior[[i]]$dist %in% c('normal','student')){
-        prior[[i]]$mean<-scale.range(prior[[i]]$mean,bassMod$range.des[,i])
+        prior[[i]]$mean<-scale_range(prior[[i]]$mean,bassMod$range.des[,i])
         prior[[i]]$sd<-prior[[i]]$sd/(bassMod$range.des[2,i]-bassMod$range.des[1,i])
         if(prior[[i]]$dist == 'normal'){
           prior[[i]]$z<-pnorm((prior[[i]]$trunc[2]-prior[[i]]$mean)/prior[[i]]$sd) - pnorm((prior[[i]]$trunc[1]-prior[[i]]$mean)/prior[[i]]$sd)
@@ -139,13 +139,13 @@ sobol<-function(bassMod,prior=NULL,prior.func=NULL,mcmc.use=NULL,func.var=NULL,x
         prior.func[[i]]$trunc<-bassMod$range.func[,i]#c(0,1)
       }
 
-      prior.func[[i]]$trunc<-scale.range(prior.func[[i]]$trunc,bassMod$range.func[,i])
+      prior.func[[i]]$trunc<-scale_range(prior.func[[i]]$trunc,bassMod$range.func[,i])
       if(prior.func[[i]]$trunc[1]<0 | prior.func[[i]]$trunc[2]>1)
         stop('truncation range of functional variable larger than training range...it is unwise to ask an emulator to extrapolate.')
       #browser()
 
       if(prior.func[[i]]$dist %in% c('normal','student')){
-        prior.func[[i]]$mean<-scale.range(prior.func[[i]]$mean,bassMod$range.func[,i])
+        prior.func[[i]]$mean<-scale_range(prior.func[[i]]$mean,bassMod$range.func[,i])
         prior.func[[i]]$sd<-prior.func[[i]]$sd/(bassMod$range.func[2,i]-bassMod$range.func[1,i])
         if(prior.func[[i]]$dist == 'normal'){
           prior.func[[i]]$z<-pnorm((prior.func[[i]]$trunc[2]-prior.func[[i]]$mean)/prior.func[[i]]$sd) - pnorm((prior.func[[i]]$trunc[1]-prior.func[[i]]$mean)/prior.func[[i]]$sd)
@@ -165,11 +165,11 @@ sobol<-function(bassMod,prior=NULL,prior.func=NULL,mcmc.use=NULL,func.var=NULL,x
   #     if(is.null(prior.func[[i]]$trunc)){
   #       prior.func[[i]]$trunc<-c(0,1)
   #     } else{
-  #       prior.func[[i]]$trunc<-scale.range(prior.func[[i]]$trunc,bassMod$range.func[,i])
+  #       prior.func[[i]]$trunc<-scale_range(prior.func[[i]]$trunc,bassMod$range.func[,i])
   #     }
   #
   #     if(prior.func[[i]]$dist %in% c('normal','student')){
-  #       prior.func[[i]]$mean<-scale.range(prior.func[[i]]$mean,bassMod$range.func[,i])
+  #       prior.func[[i]]$mean<-scale_range(prior.func[[i]]$mean,bassMod$range.func[,i])
   #       prior.func[[i]]$sd<-prior.func[[i]]$sd/(bassMod$range.func[2,i]-bassMod$range.func[1,i])
   #       if(prior.func[[i]]$dist == 'normal'){
   #         prior.func[[i]]$z<-pnorm((prior.func[[i]]$trunc[2]-prior.func[[i]]$mean)/prior.func[[i]]$sd) - pnorm((prior.func[[i]]$trunc[1]-prior.func[[i]]$mean)/prior.func[[i]]$sd)
@@ -220,7 +220,7 @@ sobol<-function(bassMod,prior=NULL,prior.func=NULL,mcmc.use=NULL,func.var=NULL,x
       rr<-range(xx.func.var)
       if(rr[1]<bassMod$range.func[1,func.var] | rr[2]>bassMod$range.func[2,func.var])
         warning(paste('range of func.var in bass function (',bassMod$range.func[1,func.var],',',bassMod$range.func[2,func.var],') is smaller than range of xx.func.var (',rr[1],',',rr[2],'), indicating some extrapolation',sep=''))
-      xx.func.var<-scale.range(xx.func.var,bassMod$range.func[,func.var])
+      xx.func.var<-scale_range(xx.func.var,bassMod$range.func[,func.var])
     }
     return(sobol_des_func(bassMod=bassMod,mcmc.use=mcmc.use,verbose=verbose,func.var=func.var,xx.func.var=xx.func.var,prior=prior,prior.cat=prior.cat))
   } else{
@@ -264,8 +264,8 @@ sobol_des<-function(bassMod,mcmc.use,verbose,prior,prior.cat,getEffects){
   var.tot.store<-f0.store<-rep(0,length(mcmc.use))
 
   ngrid<-100
-  xx=seq(0,1,length.out=ngrid) # make a different size xx for each variable...to debug
-  xxt<-t(seq(0,1,length.out=ngrid))
+  #xx=seq(0,1,length.out=ngrid) # make a different size xx for each variable...to debug
+  xxt<-lapply(1:p,function(i) t(seq(0,1,length.out=ngrid+i)))
   effects<-list()
   if(getEffects){
     for(iint in 1:min(length(combs),2)){
@@ -393,17 +393,18 @@ sobol_des<-function(bassMod,mcmc.use,verbose,prior,prior.cat,getEffects){
 
       if(getEffects){
 ##################################################################
-      # main effects
+      # main effects - trying to get fi - f0, can leave off the intercepts (a0 in Chen 2004)
 
+        f0<-bassMod$beta[mcmc.use.mod,2:(tl$M+1)]%*%matrix(apply(C1.temp,1,prod)) # without a0
         if(main.effects){
-        for(ef in 1:ncol(combs[[1]])){
-          effects[[1]][mcmc.use.mod,ef,]<- -bassMod$beta[mcmc.use.mod,2:(tl$M+1)]%*%matrix(apply(C1.temp,1,prod))
-          for(m in 1:tl$M){
-            pp.use<-combs[[1]][,ef]
-            if(tl$s[m,pp.use]!=0){
-              effects[[1]][mcmc.use.mod,ef,]<-effects[[1]][mcmc.use.mod,ef,]+tcrossprod(bassMod$beta[mcmc.use.mod,m+1],makeBasis(tl$s[m,pp.use],1,tl$t[m,pp.use],xxt,1)*prod(C1.temp[m,-pp.use]))
-            } else{
-              effects[[1]][mcmc.use.mod,ef,]<-effects[[1]][mcmc.use.mod,ef,]+bassMod$beta[mcmc.use.mod,m+1]*prod(C1.temp[m,])
+        for(ef in 1:ncol(combs[[1]])){ # go through each effect
+          effects[[1]][mod.ind,ef,]<- -f0
+          for(m in 1:tl$M){ # go through each basis function
+            pp.use<-combs[[1]][,ef] # which variable is this effect
+            if(tl$s[m,pp.use]!=0){ # if the basis function uses the variable
+              effects[[1]][mod.ind,ef,]<-effects[[1]][mod.ind,ef,]+tcrossprod(bassMod$beta[mcmc.use.mod,m+1],makeBasis(tl$s[m,pp.use],1,tl$t[m,pp.use],xxt,1)*prod(C1.temp[m,-pp.use]))
+            } else{ # if the basis function does not use the variable (integrate over all)
+              effects[[1]][mod.ind,ef,]<-effects[[1]][mod.ind,ef,]+bassMod$beta[mcmc.use.mod,m+1]*prod(C1.temp[m,])
             }
           }
           #matplot(t(effects[[1]][1,,]),type='l')
@@ -416,15 +417,16 @@ sobol_des<-function(bassMod,mcmc.use,verbose,prior,prior.cat,getEffects){
         if(two.ints){
         ## 2-way interactions
         for(ef in 1:ncol(combs[[2]])){
-          effects[[2]][mcmc.use.mod,ef,,]<- -bassMod$beta[mcmc.use.mod,2:(tl$M+1)]%*%matrix(apply(C1.temp,1,prod))
+          for(kk in 1:length(mcmc.use.mod))
+            effects[[2]][mod.ind[kk],ef,,]<- -f0[kk]
 
           pp.use<-combs[[2]][,ef]
           pp.use1<-which(combs[[1]]%in%combs[[2]][1,ef])
           pp.use2<-which(combs[[1]]%in%combs[[2]][2,ef])
 
-            effects[[2]][mcmc.use.mod,ef,,]<- sweep(effects[[2]][mcmc.use.mod,ef,,,drop=F], c(1,2,3), effects[[1]][mcmc.use.mod,pp.use1,,drop=F])
+            effects[[2]][mod.ind,ef,,]<- sweep(effects[[2]][mod.ind,ef,,,drop=F], c(1,2,3), effects[[1]][mod.ind,pp.use1,,drop=F])
 
-            effects[[2]][mcmc.use.mod,ef,,]<- sweep(effects[[2]][mcmc.use.mod,ef,,,drop=F], c(1,2,4), effects[[1]][mcmc.use.mod,pp.use2,,drop=F])
+            effects[[2]][mod.ind,ef,,]<- sweep(effects[[2]][mod.ind,ef,,,drop=F], c(1,2,4), effects[[1]][mod.ind,pp.use2,,drop=F])
 
             #image.plot(effects[[2]][mcmc.use.mod[1],ef,,])
 
@@ -438,17 +440,17 @@ sobol_des<-function(bassMod,mcmc.use,verbose,prior,prior.cat,getEffects){
               if(all(b2==0))
                 b2=b2+1
 
-              effects[[2]][mcmc.use.mod,ef,,]<-effects[[2]][mcmc.use.mod,ef,,] + drop(bassMod$beta[mcmc.use.mod,m+1]%o%(tcrossprod(b1,b2)*prod(C1.temp[m,-pp.use])))
+              effects[[2]][mod.ind,ef,,]<-effects[[2]][mod.ind,ef,,] + drop(bassMod$beta[mcmc.use.mod,m+1]%o%(tcrossprod(b1,b2)*prod(C1.temp[m,-pp.use])))
 
             }
           }
-
-        #image.plot(effects[[2]][1,1,,])
+        #browser()
+        #image.plot(effects[[2]][1,1,,],zlim=c(-10,10))
         #image.plot(matrix(10*sin(2*pi*xx2[,1]*xx2[,2]),ncol=100))
 
         #xx2<-expand.grid(t(xxt),t(xxt))
         #a1<--5/pi*sum( (-4*pi^2)^(1:50)/((2*(1:50))*factorial(2*(1:50))) )
-        #image.plot(matrix(10*sin(2*pi*xx2[,1]*xx2[,2]) - 10*sin(pi*xx2[,1])^2/(pi*xx2[,1]) - 10*sin(pi*xx2[,2])^2/(pi*xx2[,2]) + a1,nrow=100))
+        #image.plot(matrix(10*sin(2*pi*xx2[,1]*xx2[,2]) - 10*sin(pi*xx2[,1])^2/(pi*xx2[,1]) - 10*sin(pi*xx2[,2])^2/(pi*xx2[,2]) + a1,nrow=100),zlim=c(-10,10))
 
         }
         }
@@ -926,10 +928,13 @@ C1All<-function(tl){
   out
 }
 
+
+################################################################################
 # integral from a to b of (x-t)^q * prior(x) when q positive integer
-intabq1 <- function (prior, ...) {
+intabq1 <- function (prior,a,b,t,q) {
   UseMethod("intabq1", prior)
 }
+
 intabq1.uniform<-function(prior,a,b,t,q){
   1/(q+1)*((b-t)^(q+1)-(a-t)^(q+1)) * 1/(prior$trunc[2]-prior$trunc[1])
   #int<-integrate(function(x) (x-t)*dunif(x,prior$trunc[1],prior$trunc[2]),lower=a,upper=b)$value
@@ -986,6 +991,10 @@ intabq1.student<-function(prior,a,b,t,q){
   #browser()
   out
 }
+
+.S3method("intabq1", "uniform")
+.S3method("intabq1", "normal")
+.S3method("intabq1", "student")
 
 intx1Student<-function(x,m,s,v,t){
   #browser()
@@ -1050,8 +1059,10 @@ C1<-function(k,m,tl,tq=F){ #k is variable, m is basis function # deals with sign
 pCoef<-function(i,q){
   factorial(q)^2*(-1)^i/(factorial(q-i)*factorial(q+1+i))
 }
+
+################################################################################
 ## integral from a to b of [(x-t1)(x-t2)]^q * prior(x) when q positive integer
-intabq2 <- function (prior, ...) {
+intabq2 <- function (prior,a,b,t1,t2,q) {
   UseMethod("intabq2", prior)
 }
 intabq2.uniform<-function(prior,a,b,t1,t2,q){
@@ -1092,11 +1103,17 @@ intabq2.student<-function(prior,a,b,t1,t2,q){
   }
   out
 }
+
+.S3method("intabq2", "uniform")
+.S3method("intabq2", "normal")
+.S3method("intabq2", "student")
+
 # robust2f1<-function(a,b,c,x){
 #   if(abs(x)<1)
 #     return(gsl::hyperg_2F1(a,b,c,x))
 #   return(gsl::hyperg_2F1(a,c-b,c,1-1/(1-x))/(1-x)^a)
 # }
+
 robust2f1<-function(a,b,c,x){
   if(abs(x)<1)
     return(hypergeo::f15.3.8(a,b,c,x))

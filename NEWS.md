@@ -1,4 +1,20 @@
-# BASS 1.2.1
+# BASS 1.3.1
+- vignette now static to decrease CRAN burden
+- other CRAN changes
+
+# BASS 1.3.0
+- new "jeffreys" option for prior for basis coefficients
+- new function calibrate.basisBasis for modular calibration
+- sobol effects bug fix
+
+# BASS 1.2.4
+- vectorize standardization in predict.bass
+- tempering, decorrelation, adaptive MCMC, etc, for more robust calibration
+
+# BASS 1.2.3
+- add nugget option to predict.bass
+
+# BASS 1.2.2
 - remove dependency on depricated wtmsa package and remove wavelet example
 - add reference to JSS paper
 
@@ -12,7 +28,7 @@
 
 # BASS 1.1.2
 - added unit tests for prediction and Sobol decomposition for various validated models
-- added ability to write models to JSON, and read models from JSON
+- added ability to write models to JSON, and read models from JSON (later removed)
 - various options added to existing functions
 - existing function bassOB renamed to bassBasis
 
